@@ -1,0 +1,31 @@
+Package: SUMO
+Title: This package was developed to generate multi-omics datasets
+Version: 0.0.0.9000
+Authors@R: 
+    person("Bernard", "Isekah Osang'ir", , "bernard.osangir@uhasselt.be", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-5557-3602"))
+Description: This is an adaptable, user-friendly package designed generate multi-omics datasets that closely reflect the biological complexity. The simulated data can be used to test, validate and benchmark multiomics integrative methods. The data has one or multipled predefined signals (latent/unobserved factors). Users have fully control over the characteristics of the data generated.
+License: CC BY 4.0
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+LazyData: true
+RoxygenNote: 7.3.1
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Imports:
+ ggplot2,
+ gridExtra,
+ rlang
+Collate: 
+    'divide_vector.R'
+    'divide_features_two.R'
+    'divide_features_one.R'
+    'feature_selection_two.R'
+    'feature_selection_one.R'
+    'divide_samples.R'
+    'OmixCraftHD.R'
+    'SUMO.R'
+    'plot_factor.R'
+    'plot_simData.R'
+    'plot_weights.R'
