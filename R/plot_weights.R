@@ -7,6 +7,20 @@
 #' @param data Section of the integrated data to be plotted, omic.one or omic.two are the options
 #' @param type Type of plot. Scatter plot and histogram are the only allowed plots
 #' @importFrom rlang .data
+#' @examples
+#' # Examples
+#' output_obj <- OmixCraftHD(
+#'   vector_features = c(2000,3000),
+#'   sigmas_vector=c(8,5),
+#'   n_samples=100,
+#'   n_factors=4,
+#'   num.factor='multiple',
+#'   advanced_dist='mixed'
+#' )
+#' plot_weights(sim_object = output_obj, factor_num = 1, data = 'omic.one', type = 'scatter')
+#' plot_weights(sim_object = output_obj, factor_num = 1, data = 'omic.one', type = 'histogram')
+#' plot_weights(sim_object = output_obj, factor_num = 1, data = 'omic.two', type = 'scatter')
+#' plot_weights(sim_object = output_obj, factor_num = 1, data = 'omic.two', type = 'histogram')
 #' @export
 plot_weights <- function(sim_object = NULL, factor_num = 1, data = 'omic.one', type = 'scatter') {
   # Load necessary libraries
@@ -398,6 +412,8 @@ plot_weights <- function(sim_object = NULL, factor_num = 1, data = 'omic.one', t
      # Use grep to find column names starting with "omic1_feature_"
      features <- grep("^omic1_feature_", colnames(sim_data), value = TRUE)
 
+     betas_names <- as.numeric(gsub("[^0-9]", "", names(sim_object$list_betas)))
+
      if (factor_num %in% betas_names) {#if (factor_num %in% seq_along(sim_object$list_betas)) {
 
        factor <- sim_object$list_betas[[paste0('beta', factor_num)]] # Retrieve the corresponding theta value
@@ -428,7 +444,7 @@ plot_weights <- function(sim_object = NULL, factor_num = 1, data = 'omic.one', t
 
        #data <- data.frame(sim_object$concatenated_datasets[[1]])
        #features <- colnames(data)
-
+       betas_names <- as.numeric(gsub("[^0-9]", "", names(sim_object$list_betas)))
        factors <- betas_names#names(c(sim_object$list_betas[grep("beta", names(sim_object$list_betas))]))
 
        # Initialize plot_list to store plots
@@ -476,7 +492,7 @@ plot_weights <- function(sim_object = NULL, factor_num = 1, data = 'omic.one', t
 
      # Use grep to find column names starting with "omic2_feature_"
      features <- grep("^omic2_feature_", colnames(sim_data), value = TRUE)
-
+     deltas_names <- as.numeric(gsub("[^0-9]", "", names(sim_object$list_deltas)))
      if (factor_num %in% deltas_names){ #if (factor_num %in% seq_along(sim_object$list_deltas)) {
        factor <- sim_object$list_deltas[[paste0('delta', factor_num)]] # Retrieve the corresponding theta value
 
@@ -505,7 +521,7 @@ plot_weights <- function(sim_object = NULL, factor_num = 1, data = 'omic.one', t
      } else if (factor_num == 'all'){
        #sim_data <- data.frame(sim_object$concatenated_datasets[[1]])
        #features <- grep("^omic2_feature_", colnames(sim_data), value = TRUE)
-
+       deltas_names <- as.numeric(gsub("[^0-9]", "", names(sim_object$list_deltas)))
        factors <- deltas_names #names(c(sim_object$list_deltas[grep("delta", names(sim_object$list_deltas))]))
 
        # Initialize plot_list to store plots
@@ -717,21 +733,4 @@ plot_weights <- function(sim_object = NULL, factor_num = 1, data = 'omic.one', t
 utils::globalVariables(c("Index"))
 utils::globalVariables(c("x"))
 #################################################################################
-# Examples
-# plot_weights(output_sim, factor_num = 1, data = 'omic.one', type = 'scatter')
-# plot_weights(output_sim, factor_num = 1, data = 'omic.one', type = 'histogram')
-# plot_weights(output_sim, factor_num = 3, data = 'omic.one', type = 'scatter')
-# plot_weights(output_sim, factor_num = 3, data = 'omic.one', type = 'histogram')
-# plot_weights(output_sim, factor_num = 'all', data = 'omic.one', type = 'scatter')
-# plot_weights(output_sim, factor_num = 'all', data = 'omic.one', type = 'histogram')
-
-# plot_weights(output_sim, factor_num = 1, data = 'omic.two', type = 'scatter')
-# plot_weights(output_sim, factor_num = 1, data = 'omic.two', type = 'histogram')
-# plot_weights(output_sim, factor_num = 2, data = 'omic.two', type = 'scatter')
-# plot_weights(output_sim, factor_num = 2, data = 'omic.two', type = 'histogram')
-# plot_weights(output_sim, factor_num = 'all', data = 'omic.two', type = 'scatter')
-# plot_weights(output_sim, factor_num = 'all', data = 'omic.two', type = 'histogram')
-
-# plot_weights(output_sim, factor_num = 3, data = 'integrated', type = 'schttp://127.0.0.1:43149/graphics/31f676fd-25bd-4fdc-929d-1a68f264bf60.pngatter')
-# plot_Loadings_hist(output_sim, factor_num = 2, data = 'integrated', type = 'scatter')
 

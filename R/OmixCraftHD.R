@@ -15,6 +15,22 @@
 #' @include feature_selection_two.R
 #' @include divide_features_one.R
 #' @include divide_features_two.R
+#' @examples
+#' # Examples
+#' set.seed(1234)
+#' output_obj <- OmixCraftHD(
+#'   vector_features = c(2000,3000),
+#'   sigmas_vector=c(8,5),
+#'   n_samples=100,
+#'   n_factors=5,
+#'   num.factor='multiple',
+#'   advanced_dist='mixed'
+#' )
+#' output_obj <- OmixCraftHD(
+#'   vector_features = c(5000,3000),
+#'   sigmas_vector=c(3,4),
+#'   n_samples=30, n_factors=1
+#' )
 #' @export
 # @param type.factor Applicable only when num.factor = 'single'. type of factor needed to be simulated. Contains two type 'shared', 'unique'. 'shared' refers to latent factor present in both the dataset. 'unique' refers to latent factor present in one of the datasets.
 # @param signal_location Applicable only when num.factor = 'single' when type.factor = 'unique'. Contains three possible arguments empty (''), omic.one'  or 'omic.two' with 'omic.one' refers to factor only in the first data while 'omic.two' indicates the factor present only on the second data.
@@ -2238,8 +2254,8 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
 
 # Testing
 #set.seed(123)
-output_sim <- OmixCraftHD(vector_features = c(2000,3000), sigmas_vector=c(8,5), n_samples=100,
-                          n_factors=5, num.factor='multiple', advanced_dist='mixed')
+#output_sim <- OmixCraftHD(vector_features = c(2000,3000), sigmas_vector=c(8,5), n_samples=100,
+#                          n_factors=5, num.factor='multiple', advanced_dist='mixed')
 #output_sim$factor_xtics
 #plot_simData(output_sim, type = 'heatmap')
 #plot_factor(1)

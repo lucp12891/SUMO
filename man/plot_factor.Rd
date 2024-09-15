@@ -14,3 +14,14 @@ plot_factor(sim_object = NULL, factor_num = NULL)
 \description{
 Visualization of factor scores
 }
+\examples{
+# Examples
+output_obj <- OmixCraftHD(
+  vector_features = c(2000,3000),
+  sigmas_vector=c(3,4),
+  n_samples=30,
+  n_factors=1
+)
+plot_factor(sim_object = output_obj, factor_num = 1)
+plot_factor(sim_object = output_obj, factor_num = 'all')
+}

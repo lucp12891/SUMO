@@ -3,6 +3,16 @@
 #' @importFrom ggplot2 ggplot aes geom_histogram geom_point after_stat element_blank labs scale_color_viridis_c theme_minimal  theme_bw ggtitle theme element_text scale_fill_viridis_c
 #' @param sim_object R object containing data to be plotted
 #' @param factor_num Factor to be plotted.
+#' @examples
+#' # Examples
+#' output_obj <- OmixCraftHD(
+#'   vector_features = c(2000,3000),
+#'   sigmas_vector=c(3,4),
+#'   n_samples=30,
+#'   n_factors=1
+#' )
+#' plot_factor(sim_object = output_obj, factor_num = 1)
+#' plot_factor(sim_object = output_obj, factor_num = 'all')
 #' @export
   plot_factor <- function(sim_object = NULL, factor_num = NULL) {
     # libraries

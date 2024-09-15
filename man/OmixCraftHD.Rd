@@ -29,3 +29,20 @@ OmixCraftHD(
 \description{
 Simulation of high-dimensional data with predefined single factor or multiple factors in multi-omics
 }
+\examples{
+# Examples
+set.seed(1234)
+output_obj <- OmixCraftHD(
+  vector_features = c(2000,3000),
+  sigmas_vector=c(8,5),
+  n_samples=100,
+  n_factors=5,
+  num.factor='multiple',
+  advanced_dist='mixed'
+)
+output_obj <- OmixCraftHD(
+  vector_features = c(5000,3000),
+  sigmas_vector=c(3,4),
+  n_samples=30, n_factors=1
+)
+}

@@ -23,3 +23,18 @@ plot_weights(
 \description{
 Visualizing the loading of the features
 }
+\examples{
+# Examples
+output_obj <- OmixCraftHD(
+  vector_features = c(2000,3000),
+  sigmas_vector=c(8,5),
+  n_samples=100,
+  n_factors=4,
+  num.factor='multiple',
+  advanced_dist='mixed'
+)
+plot_weights(sim_object = output_obj, factor_num = 1, data = 'omic.one', type = 'scatter')
+plot_weights(sim_object = output_obj, factor_num = 1, data = 'omic.one', type = 'histogram')
+plot_weights(sim_object = output_obj, factor_num = 1, data = 'omic.two', type = 'scatter')
+plot_weights(sim_object = output_obj, factor_num = 1, data = 'omic.two', type = 'histogram')
+}

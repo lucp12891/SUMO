@@ -4,7 +4,7 @@
 \name{SUMO}
 \alias{SUMO-package}
 \alias{SUMO}
-\title{SUMO: A Package for Simulating multi-omics Data}
+\title{SUMO: A Package for Simulating Multi-omics Data}
 \description{
 SUMO provides tools for simulating complex multi-omics data, allowing researchers to generate datasets that reflect the biological intricacies found in real-world data. This package aims to fill a gap in current omics research by providing users with flexible and customizable tools for generating synthetic data that can be used for method development, benchmarking of Multi-Omics methods.
 }

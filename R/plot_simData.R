@@ -3,6 +3,18 @@
 #' @param sim_object R object containing simulated data to be plotted
 #' @param type type of the plot. Heatmap for image plot and 3D for persp 3D plot
 #' @importFrom graphics image persp
+#' @examples
+#' # Examples
+#' output_obj <- OmixCraftHD(
+#'   vector_features = c(2000,3000),
+#'   sigmas_vector=c(8,5),
+#'   n_samples=100,
+#'   n_factors=5,
+#'   num.factor='multiple',
+#'   advanced_dist='mixed'
+#' )
+#' plot_simData(sim_object = output_obj, type = "heatmap")
+#' plot_simData(sim_object = output_obj, type = "3D")
 #' @export
 plot_simData <- function(sim_object, type='heatmap'){
   datasets <- sim_object$concatenated_datasets

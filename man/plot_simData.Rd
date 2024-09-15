@@ -14,3 +14,16 @@ plot_simData(sim_object, type = "heatmap")
 \description{
 Visualizing the simulated data using image map and 3D visualization
 }
+\examples{
+# Examples
+output_obj <- OmixCraftHD(
+  vector_features = c(2000,3000),
+  sigmas_vector=c(8,5),
+  n_samples=100,
+  n_factors=5,
+  num.factor='multiple',
+  advanced_dist='mixed'
+)
+plot_simData(sim_object = output_obj, type = "heatmap")
+plot_simData(sim_object = output_obj, type = "3D")
+}
