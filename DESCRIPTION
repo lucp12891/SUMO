@@ -1,15 +1,16 @@
 Package: SUMO
-Title: This Package Was Developed to Generate Multi-Omics Datasets
+Title: Generating Multi-Omics Datasets
 Version: 0.1.0
 Authors@R: 
-    person("Bernard", "Isekah Osang'ir", , "bernard.osangir@uhasselt.be", role = c("aut", "cre"),
-           comment = c(ORCID = "0000-0002-5557-3602"))
-Description: This is an adaptable, user-friendly package designed generate multi-omics datasets that closely reflect the biological complexity. The simulated data can be used to test, validate and benchmark multi-omics integrative methods. The data has one or multiple predefined signals (latent/unobserved factors). Users have fully control over the characteristics of the data generated.
+    c(person("Bernard", "Isekah Osang'ir", email = "Bernard.Osangir@sckcen.be", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-5557-3602")),
+    person("Bernard", "Isekah Osang'ir", email = "bernard.osangir@uhasselt.be", role = "aut"))
+Description: Designed to generate multi-omics datasets that closely reflect biological complexity, the package allows for testing, validation, and benchmarking of multi-omics integrative methods. The simulated data includes one or multiple predefined signals (latent/unobserved factors), giving users complete control over the data-generated characteristics. Tini, Giulia, et al (2019) <doi:10.1093/bib/bbx167>.
 License: CC BY 4.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 LazyData: true
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.2
 Suggests: 
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
