@@ -1,41 +1,363 @@
 #' @name OmixCraftHD
-#' @title Simulation of high-dimensional data with predefined single factor or multiple factors in multi-omics
-#' @param vector_features Vector of features assigned to the two simulated datasets respectively '1' first dataset, '2' second dataset
-#' @param n_samples The number of samples common between the two simulated datasets
-#' @param sigmas_vector Vector for the noise variability for the two simulated datasets respectively,  '1' first dataset, '2' second dataset
-#' @param n_factors Number of predefined factors
-#' @param num.factor Category of factors to be simulated specified as 'single', or 'multiple'.
-#' @param advanced_dist Applicable only when num.factor = 'multiple'. Contains six possible arguments, '', NULL, 'mixed', 'omic.one', or 'omic.two', 'exclusive'
+#' @title Simulation of omics with predefined single or multiple latent factors in multi-omics
+#' @description Simulates two high-dimensional omics datasets with customizable latent factor structures. Users can control the number and type of factors (shared, unique, mixed), the signal-to-noise ratio, and the distribution of signal-carrying samples and features. The function is flexible for benchmarking multi-omics integration methods under various controlled scenarios.
+#'
+#' @param vector_features A numeric vector of length two, specifying the number of features in the first and second omics datasets, respectively.
+#' @param n_samples Integer. The number of samples shared between both omics datasets.
+#' @param n_factors Integer. Number of latent factors to simulate.
+#' @param signal.samples Optional numeric vector of length two: the first element is the mean, and the second is the variance of the number of signal-carrying samples per factor. If NULL, signal assignment is inferred from `snr`.
+#' @param signal.features.one Optional numeric vector of length two: the first element is the mean, and the second is the variance of the number of signal-carrying features per factor in the first omic.
+#' @param signal.features.two Optional numeric vector of length two: the first element is the mean, and the second is the variance of the number of signal-carrying features per factor in the second omic.
+#' @param num.factor Character string. Either 'single' or 'multiple'. Determines whether to simulate a single latent factor or multiple factors.
+#' @param snr Numeric. Signal-to-noise ratio used to estimate the background noise. The function uses this value to infer the proportion of signal versus noise in the simulated datasets.
+#' @param advanced_dist Character string. Specifies how latent factors are distributed when `num.factor = 'multiple'`. Options include: '', NULL, 'mixed', 'omic.one', 'omic.two', or 'exclusive'.
+#' @param ... Additional arguments (not currently used).
 #' @importFrom stats rnorm setNames runif
 #' @importFrom ggplot2 ggplot aes geom_point
 #' @importFrom gridExtra grid.arrange
 #' @importFrom rlang abort
+#' @importFrom stats sd
+#' @importFrom utils data
+#' @importFrom readxl read_excel
+#' @importFrom readr read_csv
+#' @importFrom stringr str_detect
 #' @include divide_samples.R
 #' @include feature_selection_one.R
 #' @include feature_selection_two.R
 #' @include divide_features_one.R
 #' @include divide_features_two.R
-#' @examples
-#' # Examples
+#'
+#' #' @examples
+#' # Example 1: Simulate with default settings and 3 latent factors
 #' set.seed(1234)
-#' output_obj <- OmixCraftHD(
-#'   vector_features = c(2000,3000),
-#'   sigmas_vector=c(8,5),
-#'   n_samples=100,
-#'   n_factors=5,
-#'   num.factor='multiple',
-#'   advanced_dist='mixed'
+#' output1 <- OmixCraftHD(
+#'   vector_features = c(2000, 2000),
+#'   n_samples = 50,
+#'   n_factors = 3
 #' )
-#' output_obj <- OmixCraftHD(
-#'   vector_features = c(5000,3000),
-#'   sigmas_vector=c(3,4),
-#'   n_samples=30, n_factors=1
+
+#' # Example 2: Simulate 5 latent factors with user-defined signal regions
+#' set.seed(5678)
+#' output2 <- OmixCraftHD(
+#'   vector_features = c(3000, 2500),
+#'   n_samples = 100,
+#'   n_factors = 5,
+#'   signal.samples = c(3, 0.5),          # mean = 3 samples, variance = 0.5
+#'   signal.features.one = c(5, 2.0),     # mean = 5  in omic1, variance = 2.0
+#'   signal.features.two = c(4.5, 0.05),  # mean = 4.5 in omic2, variance = 0.05
+#'   snr = 2,
+#'   num.factor = 'multiple',
+#'   advanced_dist = 'mixed'
 #' )
+
+#' # Example 3: Simulate single factor scenario using SNR-based default signal regions
+#' set.seed(91011)
+#' output3 <- OmixCraftHD(
+#'   vector_features = c(4000, 3000),
+#'   n_samples = 60,
+#'   n_factors = 1,
+#'   snr = 1.5,
+#'   num.factor = 'single'
+#' )
+
 #' @export
 # @param type.factor Applicable only when num.factor = 'single'. type of factor needed to be simulated. Contains two type 'shared', 'unique'. 'shared' refers to latent factor present in both the dataset. 'unique' refers to latent factor present in one of the datasets.
 # @param signal_location Applicable only when num.factor = 'single' when type.factor = 'unique'. Contains three possible arguments empty (''), omic.one'  or 'omic.two' with 'omic.one' refers to factor only in the first data while 'omic.two' indicates the factor present only on the second data.
 
-OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_vector = c(3,5), n_factors = 3, num.factor = 'multiple', advanced_dist = NULL){
+OmixCraftHD <- function(vector_features = c(2000,2000),
+                        n_samples = 50,
+                        n_factors = 3,
+                        signal.samples = NULL, #(signal.samples[1]*signal.feaures.one[1])/snr
+                        signal.features.one = NULL,
+                        signal.features.two = NULL,
+                        num.factor = 'multiple',
+                        snr = 1,
+                        advanced_dist = NULL, ...){
+
+  # Set defaults dynamically
+  if (is.null(signal.samples)) signal.samples <- c(3, 0.05)
+  if (is.null(signal.features.one)) signal.features.one <- c(4.5, 0.05)
+  if (is.null(signal.features.two)) signal.features.two <- c(5.0, 0.05)
+
+  # Capture additional arguments
+  args <- list(...)
+
+  #### DEMONSTRATION
+  # Check if 'multiomics_demo' is provided
+  multiomics_demo <- if ("multiomics_demo" %in% names(args)) args$multiomics_demo else FALSE
+
+  # If multiomics_demo is "SHOW", invoke the multi-omics demo function
+  if (identical(multiomics_demo, "SHOW")) {
+    n_factors = 2
+    message("Multi-omics demo mode activated! Simulation Available for 2 Latent Factors")
+
+    packages <- c("readr", "officer","rvg", "readxl", "dplyr", "tidyverse", "stringr", "basilisk", "MOFA2", "data.table", "MOFAdata")
+    for (pkg in packages) {
+      suppressPackageStartupMessages(library(pkg, character.only = TRUE))
+    }
+
+    # setting seed
+    set.seed(694)
+
+    # Load dataset
+    utils::data("CLL_data")
+    CLL_data2 <- CLL_data[c(2, 3)]
+    mRNA <- CLL_data2[[1]]
+    methylation <- CLL_data2[[2]]
+
+    # Process mRNA Data
+    mRNA_cleaned <- data.frame(mRNA) %>%
+      mutate(across(everything(), ~ replace(., is.na(.), 0)))
+    #image(1:dim(t(mRNA_cleaned))[1], 1:dim(t(mRNA_cleaned))[2], t(mRNA_cleaned), ylab = "mRNA", xlab = "samples")
+
+    # Process Methylation Data
+    methylation_cleaned <- data.frame(methylation) %>%
+      mutate(across(everything(), ~ replace(., is.na(.), 0)))
+    #image(1:dim(t(methylation_cleaned))[1], 1:dim(t(methylation_cleaned))[2], t(methylation_cleaned), ylab = "DNA methylation", xlab = "samples")
+
+    overall_mean_mRNA <- mean(t(mRNA_cleaned),na.rm = TRUE)
+    overall_mean_methyl <- mean(t(methylation_cleaned),na.rm = TRUE)
+
+    overall_sd_mRNA <- sd(t(mRNA_cleaned),na.rm = TRUE)
+    overall_sd_methyl <- sd(t(methylation_cleaned),na.rm = TRUE)
+
+    # samples parameters
+    # means
+    row_means.one <- rowMeans(t(methylation_cleaned), na.rm = TRUE)
+    row_means.one = mean(row_means.one)
+    row_means.two <- rowMeans(t(mRNA_cleaned), na.rm = TRUE)
+    row_means.two = mean(row_means.two)
+
+    # sd
+    row_sd.one <- apply(t(methylation_cleaned), 1, sd, na.rm = TRUE)
+    row_sd.one = mean(row_sd.one)
+    row_sd.two <- apply(t(mRNA_cleaned), 1, sd, na.rm = TRUE)
+    row_sd.two = mean(row_sd.two)
+
+    mean_smp = mean(row_means.one, row_means.two) # average the means
+    sd_smp = mean(row_sd.one, row_sd.two) # average the sd's
+
+    # means and sd omic one
+    col_means.one <- colMeans(t(methylation_cleaned), na.rm = TRUE)
+    col_means.one = mean(col_means.one)
+
+    col_sd.one <- apply(t(methylation_cleaned), 2, sd, na.rm = TRUE)
+    col_sd.one = mean(col_sd.one)
+
+    # means and sd omic two
+    col_means.two <- colMeans(t(mRNA_cleaned), na.rm = TRUE)
+    col_means.two = mean(col_means.two)
+
+    col_sd <- apply(t(mRNA_cleaned), 2, sd, na.rm = TRUE)
+    col_sd.two = mean(col_sd)
+
+    n_features_one <- vector_features[1]
+    n_features_two <- vector_features[2]
+
+    # Helper function to run FABIA and extract loadings and scores.
+    # run_fabia <- function(data, num_factors) {
+    #   fabia_object <- fabia(as.matrix(data), p = num_factors, alpha = 0.01,
+    #                         cyc = 1000, spl = 0.5, spz = 0.5, random = 1.0,
+    #                         center = 2, norm = 2, lap = 1.0, nL = 1)
+    #   list(
+    #     loading = fab_loading(fabia_object, num_factors),
+    #     score   = fab_score(fabia_object, num_factors),
+    #     X       = fabia_object@X
+    #   )
+    # }
+
+    all_omic_data <- list()
+
+    #for (iter in 1:iterations) {
+    #valid_data <- FALSE
+    #while (!valid_data) {
+    #########################################
+    ## 1. Set Up Latent Factors & Samples  ##
+    #########################################
+    n_s <- n_samples
+
+    # Define two ranges of sample indices where the signal will be boosted.
+    s_range1 <- ceiling(n_s / 5.3) : ceiling(n_s / 2.8) # Can user define this?
+    s_range2 <- ceiling(n_s / 2) :ceiling(n_s / 1.43) # Can user define this?
+    assigned_samples <- list(sample(s_range1), sample(s_range2))
+    max_factors <- length(assigned_samples)
+
+    # Create latent vectors "alpha" for each factor.
+    list_alphas <- lapply(1:max_factors, function(i) rnorm(n_samples, (mean_smp/4), (sd_smp/2)))
+    names(list_alphas) <- paste0("alpha", 1:max_factors)
+
+    # In the preselected indices for each factor, increase the mean.
+    for (i in seq_along(assigned_samples)) {
+      inds <- assigned_samples[[i]]
+      list_alphas[[i]][inds] <- rnorm(length(inds), mean = (row_means.one + 1.5), sd = (sd_smp/(2*sd_smp))) #+2.0 make signal not super noisy, calibrate from dividing by 2 to dividing by 4
+    } # For signal add 1.5 to distinguish the row-means
+
+    #########################################
+    ## 2. Decide Factor Sharing Between Omics ##
+    #########################################
+
+    # Here we force factor 1 to be shared and randomly assign the others.
+    all_factors <- 1:max_factors
+    shared_factor <- 1            # fixed shared factor
+    remaining <- setdiff(all_factors, shared_factor)
+    shuffled <- if (length(remaining) == 1) remaining else sample(remaining)
+    split_point <- sample(1:length(shuffled), 1)
+    omic1_unique <- shuffled[1:split_point]
+    omic2_unique <- setdiff(shuffled, omic1_unique)
+
+    factors_omic1 <- c(shared_factor, omic1_unique)
+    factors_omic2 <- c(shared_factor, omic2_unique)
+
+    #########################################
+    ## 3. Build the Signal for Omic1       ##
+    #########################################
+
+    # Define two feature index ranges for omic1.
+    feat_range1 <- (n_features_one / n_features_one):ceiling(n_features_one / 11.43) # can it be specified by the user and have default?
+    feat_range2 <- ceiling(n_features_one / 1.48) :ceiling(n_features_one / 1.31) # can it be specified by the user and have default?
+    assigned_features <- list(sample(feat_range1), sample(feat_range2))
+
+    # For each set of features create a beta vector.
+    list_betas <- lapply(1:length(assigned_features), function(i) {
+      beta <- rnorm(n_features_one, (col_means.one/4), (col_sd.one/2)) #0.05
+      inds <- assigned_features[[i]]
+      beta[inds] <- rnorm(length(inds), mean = (col_means.one + 1.5), sd = (col_sd.one/(2*col_sd.one))) # lower the signal noise
+      beta
+    })
+    names(list_betas) <- paste0("beta", factors_omic1)
+
+    # Keep only those factors that appear in both lists.
+    common_factors <- intersect(
+      as.numeric(gsub("\\D", "", names(list_alphas))),
+      as.numeric(gsub("\\D", "", names(list_betas)))
+    )
+    list_alphas_sub <- list_alphas[paste0("alpha", common_factors)]
+    list_betas_sub  <- list_betas[paste0("beta", common_factors)]
+
+    # Create the signal as the sum of outer products.
+    signal_list_omic1 <- mapply(function(a, b) a %*% t(b[1:n_features_one]),
+                                list_alphas_sub, list_betas_sub,
+                                SIMPLIFY = FALSE)
+    signal_omic1 <- Reduce(`+`, signal_list_omic1)
+    signal_mat_omic1 <- matrix(signal_omic1, n_samples, n_features_one)
+
+    # Set noise so that mean(signal)/Var(noise) = snr.
+    m_signal1   <- (col_means.one + 0)#mean(4.5, 5.0)#mean(signal_mat_omic1)
+    noise_var1  <- m_signal1 / snr       # noise variance computed from the signal mean.
+    noise_sd1   <- sqrt(noise_var1)
+    omic1_data  <- signal_mat_omic1 +
+      matrix(rnorm(n_samples * n_features_one, 0, noise_var1),
+             n_samples, n_features_one)
+    colnames(omic1_data) <- paste0("omic1_feature_", 1:n_features_one)
+    rownames(omic1_data) <- paste0("sample_", 1:n_samples)
+
+    # Shuffle the samples (rows) and features (columns) in omic1_data:
+    # --- Shuffle the samples consistently across omic1 and omic2 ---
+    common_sample_order <- sample(n_samples)
+    #omic1_data <- omic1_data[common_sample_order, ]  # to reshuffle uncheck the hashtag
+    #omic1_data <- omic1_data[, sample(ncol(omic1_data))]  # to reshuffle uncheck the hashtag
+    #omic1_data <- omic1_data[sample(nrow(omic1_data)), sample(ncol(omic1_data))]
+
+    #########################################
+    ## 4. Build the Signal for Omic2         ##
+    #########################################
+    # For omic2 we re-use the latent factors (renamed as "gamma")
+    # but only keep those corresponding to factors chosen for omic2.
+    list_gammas <- list_alphas
+    names(list_gammas) <- gsub("alpha", "gamma", names(list_gammas))
+    numeric_gamma <- as.numeric(gsub("\\D", "", names(list_gammas)))
+    list_gammas <- list_gammas[numeric_gamma %in% factors_omic2]
+
+    # Define a feature index range for omic2.
+    feat_range_omic2 <- ceiling(n_features_two/1.11) :n_features_two
+    assigned_features_omic2 <- sample(feat_range_omic2, (n_features_two - ceiling(n_features_two/1.11)))
+
+    # Create a delta vector for omic2.
+    list_deltas <- list(rnorm(n_features_two, (col_means.two/4), (col_sd.two/2))) #0.05
+    inds <- assigned_features_omic2
+    list_deltas[[1]][inds] <- rnorm(length(inds), mean = (col_means.two + 4), sd = (col_sd.two/2)) #0.05
+    names(list_deltas) <- paste0("delta", factors_omic2[1])
+
+    common_factors2 <- intersect(
+      as.numeric(gsub("\\D", "", names(list_gammas))),
+      as.numeric(gsub("\\D", "", names(list_deltas)))
+    )
+    list_gammas_sub <- list_gammas[paste0("gamma", common_factors2)]
+    list_deltas_sub  <- list_deltas[paste0("delta", common_factors2)]
+
+    signal_list_omic2 <- mapply(function(g, d) g %*% t(d[1:n_features_two]),
+                                list_gammas_sub, list_deltas_sub,
+                                SIMPLIFY = FALSE)
+    signal_omic2 <- Reduce(`+`, signal_list_omic2)
+    signal_mat_omic2 <- matrix(signal_omic2, n_samples, n_features_two)
+
+    m_signal2   <- (col_means.two + 4) #5.0 #mean(signal_mat_omic2)
+    noise_var2  <- m_signal2 / snr
+    #noise_sd2   <- sqrt(noise_var2)
+    omic2_data  <- signal_mat_omic2 +
+      matrix(rnorm(n_samples * n_features_two, 0, noise_var2),
+             n_samples, n_features_two)
+    colnames(omic2_data) <- paste0("omic2_feature_", 1:n_features_two)
+    rownames(omic2_data) <- paste0("sample_", 1:n_samples)
+
+    # Shuffle the samples (rows) and features (columns) in omic2_data:
+    # --- Shuffle the samples consistently across omic1 and omic2 ---
+    #omic2_data <- omic2_data[common_sample_order, ] # to reshuffle uncheck the hashtag
+    #omic2_data <- omic2_data[, sample(ncol(omic2_data))]  # to reshuffle uncheck the hashtag
+    #omic1_data <- omic1_data[sample(nrow(omic1_data)), sample(ncol(omic1_data))]
+
+    #omic2_data <- omic2_data[sample(nrow(omic2_data)), sample(ncol(omic2_data))]
+
+    #########################################
+    ## 5. Validate via FABIA                ##
+    #########################################
+    concatenated_data <- cbind(omic2_data, omic1_data)
+    # fabia_result <- run_fabia(concatenated_data, num_factors = 2)
+    # fab_loading1 <- fabia_result$loading$loading_FABIA1
+    # fab_score1   <- fabia_result$score$score_FABIA1
+    # fab_loading2 <- fabia_result$loading$loading_FABIA2
+    # fab_score2   <- fabia_result$score$score_FABIA2
+    #
+    # if (!any(is.na(fab_loading1)) && mean(fab_loading1, na.rm = TRUE) != 0 &&
+    #     !any(is.na(fab_score1))   && mean(fab_score1, na.rm = TRUE) != 0 &&
+    #     !any(is.na(fab_loading2)) && mean(fab_loading2, na.rm = TRUE) != 0 &&
+    #     !any(is.na(fab_score2))   && mean(fab_score2, na.rm = TRUE) != 0) {
+    #   valid_data <- TRUE
+    # } else {
+    #   message("FABIA validation failed, regenerating data ...")
+    # }
+    #}  # end while(valid_data)
+
+    concatenated_datasets <- cbind(omic2_data, omic1_data)
+    all_omic_data <- list(#[[paste0("iteration_", iter)]] <- list(
+      concatenated_datasets = concatenated_datasets,
+      number_of_factors = n_factors,
+      n_samples = n_s,
+      n_features_one = n_features_one,
+      n_features_two = n_features_two,
+      snr = snr,
+      sd_smp = sd_smp,
+      list_alphas=list_alphas,
+      list_gammas=list_gammas,
+      list_betas=list_betas,
+      list_deltas=list_deltas,
+      noise = c(min(noise_var1), max(noise_var2)),
+      indices_features_omic1 = assigned_features,
+      indices_samples        = assigned_samples,
+      indices_features_omic2 = list(assigned_features_omic2),
+      sample_range1          = c(min(s_range1), max(s_range1)),
+      sample_range2          = c(min(s_range2), max(s_range2)),
+      feature_range_omic1_1  = c(min(feat_range1), max(feat_range1)),
+      feature_range_omic1_2  = c(min(feat_range2), max(feat_range2)),
+      feature_range_omic2    = c(min(feat_range_omic2), max(feat_range_omic2))
+
+    )
+    #}  # end for(iter)
+
+    return(all_omic_data)
+
+  }
+
   if(num.factor == 'single'){
     # FeaturesD
     n_features_one <- vector_features[1]
@@ -93,7 +415,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           # Assigning the signal to the selected indices
           for (i in seq_along(alpha)) {
             indices <- assigned_indices_samples#[[i]]
-            alpha[[i]][indices] <- rnorm(length(indices), (3 + 0.5*i), 0.05)  # Adjust values dynamically
+            alpha[[i]][indices] <- rnorm(length(indices), mean = (signal.samples[1] + 0.5*i), sd = signal.samples[2]) #rnorm(length(indices), (3 + 0.5*i), 0.05)  # Adjust values dynamically
           }
 
           # # First OMIC data
@@ -111,7 +433,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           # Assign corresponding values to betas variables based on assigned_indices_features
           for (i in all_indices) {
             indices <- assigned_indices_features[[i]]
-            beta[[i]][indices] <- rnorm(length(indices), (4.0 + 0.5 * i), 0.05)  # Adjust values dynamically
+            beta[[i]][indices] <- rnorm(length(indices), (signal.features.one[1]+0.5*i), signal.features.one[2])  # Adjust values dynamically
           }
 
           pattern_alpha <-"^alpha\\d+"
@@ -137,7 +459,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           omic.one <- list()
 
           # Noise in the first detasets
-          sigma <- sigmas_vector[1]
+          sigma <- (signal.samples[1]*signal.features.one[1])/snr #sigmas_vector[1]
 
           eps1 <- rnorm(n_samples*n_features_one, 0, sigma) # noise
           omic.one[[length(omic.one) + 1]] <- matrix(data.1, n_samples, n_features_one) + matrix(eps1, n_samples, n_features_one) # signal + noise
@@ -188,7 +510,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           omic.two <- list()
 
           # Noise in the second detasets
-          sigma <- sigmas_vector[2]
+          sigma <- (signal.samples[1]*signal.features.two[1])/snr#sigmas_vector[2]
 
           eps2 <- rnorm(n_samples*n_features_two, 0, sigma) # noise
           omic.two[[length(omic.two) + 1]] <- matrix(data.2, n_samples, n_features_two) + matrix(eps2, n_samples, n_features_two) # signal + noise
@@ -204,7 +526,10 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
             concatenated_data <- cbind(simulated_datasets$object.two[[i]],simulated_datasets$object.one[[i]])
             concatenated_datasets[[i]] <- concatenated_data
           }
-          sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
+          #sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
+          signal_annotation = list(samples = assigned_indices_samples, omic.one = assigned_indices_features, omic.two = assigned_indices_features_omic.two)
+          sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, signal_annotation = signal_annotation, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+
           return(sim_output)
 
         }else if (selected.omic == 'omic.two') {
@@ -216,7 +541,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           # Assigning the signal to the selected indices
           for (i in seq_along(alpha)) {
             indices <- assigned_indices_samples#[[i]]
-            alpha[[i]][indices] <- rnorm(length(indices), (3 + 0.5*i), 0.05)  # Adjust values dynamically
+            alpha[[i]][indices] <- rnorm(length(indices), (signal.samples[1] + 0.5*i), signal.samples[2])  # Adjust values dynamically
           }
 
 
@@ -259,7 +584,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           omic.one <- list()
 
           # Noise in the first detasets
-          sigma <- sigmas_vector[1]
+          sigma <- (signal.samples[1]*signal.features.one[1])/snr#sigmas_vector[1]
 
           eps1 <- rnorm(n_samples*n_features_one, 0, sigma) # noise
           omic.one[[length(omic.one) + 1]] <- matrix(data.1, n_samples, n_features_one) + matrix(eps1, n_samples, n_features_one) # signal + noise
@@ -308,7 +633,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           omic.two <- list()
 
           # Noise in the second detasets
-          sigma <- sigmas_vector[2]
+          sigma <- (signal.samples[1]*signal.features.two[1])/snr#sigmas_vector[2]
 
           eps2 <- rnorm(n_samples*n_features_two, 0, sigma) # noise
           omic.two[[length(omic.two) + 1]] <- matrix(data.2, n_samples, n_features_two) + matrix(eps2, n_samples, n_features_two) # signal + noise
@@ -322,7 +647,10 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
             concatenated_data <- cbind(simulated_datasets$object.two[[i]],simulated_datasets$object.one[[i]])
             concatenated_datasets[[i]] <- concatenated_data
           }
-          sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
+          #sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
+          signal_annotation = list(samples = assigned_indices_samples, omic.one = assigned_indices_features, omic.two = assigned_indices_features_omic.two)
+          sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, signal_annotation = signal_annotation, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+
           return(sim_output)
 
         } else{
@@ -338,7 +666,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         # Assigning the signal to the selected indices
         for (i in seq_along(alpha)) {
           indices <- assigned_indices_samples
-          alpha[[i]][indices] <- rnorm(length(indices), (3 + 0.5*i), 0.05)  # Adjust values dynamically
+          alpha[[i]][indices] <- rnorm(length(indices), (signal.samples[1] + 0.5*i), signal.samples[2])  # Adjust values dynamically
         }
 
         # # First OMIC data
@@ -356,7 +684,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         # Assign corresponding values to betas variables based on assigned_indices_features
         for (i in all_indices) {
           indices <- assigned_indices_features[[i]]
-          beta[[i]][indices] <- rnorm(length(indices), (4.0 + 0.5 * i), 0.05)  # Adjust values dynamically
+          beta[[i]][indices] <- rnorm(length(indices), (signal.features.one[1] + 0.5 * i), signal.features.one[2])  # Adjust values dynamically
         }
 
         pattern_alpha <-"^alpha\\d+"
@@ -382,7 +710,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         omic.one <- list()
 
         # Noise in the first detasets
-        sigma <- sigmas_vector[1]
+        sigma <- (signal.samples[1]*signal.features.one[1])/snr #sigmas_vector[1]
 
         eps1 <- rnorm(n_samples*n_features_one, 0, sigma) # noise
         omic.one[[length(omic.one) + 1]] <- matrix(data.1, n_samples, n_features_one) + matrix(eps1, n_samples, n_features_one) # signal + noise
@@ -433,7 +761,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         omic.two <- list()
 
         # Noise in the second detasets
-        sigma <- sigmas_vector[2]
+        sigma <- (signal.samples[1]*signal.features.two[1])/snr#sigmas_vector[2]
 
         eps2 <- rnorm(n_samples*n_features_two, 0, sigma) # noise
         omic.two[[length(omic.two) + 1]] <- matrix(data.2, n_samples, n_features_two) + matrix(eps2, n_samples, n_features_two) # signal + noise
@@ -449,7 +777,10 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           concatenated_data <- cbind(simulated_datasets$object.two[[i]],simulated_datasets$object.one[[i]])
           concatenated_datasets[[i]] <- concatenated_data
         }
-        sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
+        signal_annotation = list(samples = assigned_indices_samples, omic.one = assigned_indices_features, omic.two = assigned_indices_features_omic.two)
+        sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, signal_annotation = signal_annotation, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+
+        #sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
         return(sim_output)
 
       }else if (signal_location == 'omic.two') {
@@ -462,7 +793,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         # Assigning the signal to the selected indices
         for (i in seq_along(alpha)) {
           indices <- assigned_indices_samples#[[i]]
-          alpha[[i]][indices] <- rnorm(length(indices), (3 + 0.5*i), 0.05)  # Adjust values dynamically
+          alpha[[i]][indices] <- rnorm(length(indices), (signal.samples[1] + 0.5*i), signal.samples[2])  # Adjust values dynamically
         }
 
 
@@ -479,7 +810,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         # Assign corresponding values to betas variables based on assigned_indices_features
         for (i in all_indices) {
           indices <- assigned_indices_features[[i]]
-          beta[[i]][indices] <- rnorm(length(indices), 0, 0.05)  # Adjust values dynamically
+          beta[[i]][indices] <- rnorm(length(indices), 0, signal.features.one[2])  # Adjust values dynamically
         }
 
         pattern_alpha <-"^alpha\\d+"
@@ -505,7 +836,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         omic.one <- list()
 
         # Noise in the first detasets
-        sigma <- sigmas_vector[1]
+        sigma <- (signal.samples[1]*signal.features.one[1])/snr#sigmas_vector[1]
 
         eps1 <- rnorm(n_samples*n_features_one, 0, sigma) # noise
         omic.one[[length(omic.one) + 1]] <- matrix(data.1, n_samples, n_features_one) + matrix(eps1, n_samples, n_features_one) # signal + noise
@@ -528,7 +859,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         # Assign corresponding values to betas variables based on assigned_indices_features
         for (i in all_indices) {
           indices <- assigned_indices_features_omic.two[[i]]
-          delta[[i]][indices] <- rnorm(length(indices), 10 + 0.05*i, 0.05)  # Adjust values dynamically
+          delta[[i]][indices] <- rnorm(length(indices), (signal.features.two[1] + 0.05*i), signal.features.two[2])  # Adjust values dynamically
         }
 
         pattern_gamma <-"^alpha\\d+"
@@ -554,7 +885,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         omic.two <- list()
 
         # Noise in the second detasets
-        sigma <- sigmas_vector[2]
+        sigma <- (signal.samples[1]*signal.features.two[1])/snr#sigmas_vector[2]
 
         eps2 <- rnorm(n_samples*n_features_two, 0, sigma) # noise
         omic.two[[length(omic.two) + 1]] <- matrix(data.2, n_samples, n_features_two) + matrix(eps2, n_samples, n_features_two) # signal + noise
@@ -568,7 +899,10 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           concatenated_data <- cbind(simulated_datasets$object.two[[i]],simulated_datasets$object.one[[i]])
           concatenated_datasets[[i]] <- concatenated_data
         }
-        sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
+        signal_annotation = list(samples = assigned_indices_samples, omic.one = assigned_indices_features, omic.two = assigned_indices_features_omic.two)
+        sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, signal_annotation = signal_annotation, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+
+        #sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
         return(sim_output)
       }
 
@@ -582,7 +916,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       # Assigning the signal to the selected indices
       for (i in seq_along(alpha)) {
         indices <- assigned_indices_samples
-        alpha[[i]][indices] <- rnorm(length(indices), (3 + 0.5*i), 0.05)  # Adjust values dynamically
+        alpha[[i]][indices] <- rnorm(length(indices), (signal.samples[1] + 0.5*i), signal.samples[2])  # Adjust values dynamically
       }
 
       # First OMIC data
@@ -617,7 +951,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       #all_indices <- seq_along(assigned_indices_features)
       for (i in seq_along(num)) {
         indices <- assigned_indices_features#[[i]]
-        beta[[i]][indices] <- rnorm(length(indices), (4.0 + 0.5 * i), 0.05)  # Adjust values dynamically
+        beta[[i]][indices] <- rnorm(length(indices), (signal.features.one[1] + 0.5 * i), signal.features.one[2])  # Adjust values dynamically
       }
 
       pattern_alpha <-"^alpha\\d+"
@@ -643,7 +977,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       omic.one <- list()
 
       # Noise in the first detasets
-      sigma <- sigmas_vector[1]
+      sigma <- (signal.samples[1]*signal.features.one[1])/snr#sigmas_vector[1]
 
       eps1 <- rnorm(n_samples*n_features_one, 0, sigma) # noise
       omic.one[[length(omic.one) + 1]] <- matrix(data.1, n_samples, n_features_one) + matrix(eps1, n_samples, n_features_one) # signal + noise
@@ -684,7 +1018,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       # Assign corresponding values to betas variables based on assigned_indices_features
       for (i in seq_along(num)) {
         indices <- assigned_indices_features_omic.two#[[i]]
-        delta[[i]][indices] <- rnorm(length(indices), 6 + 0.05*i, 0.05)  # Adjust values dynamically
+        delta[[i]][indices] <- rnorm(length(indices), (signal.features.two[1] + 0.05*i), signal.features.one[2])  # Adjust values dynamically
       }
 
       pattern_gamma <-"^alpha\\d+"
@@ -710,7 +1044,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       omic.two <- list()
 
       # Noise in the second detasets
-      sigma <- sigmas_vector[2]
+      sigma <- (signal.samples[1]*signal.features.two[1])/snr#sigmas_vector[2]
 
       eps2 <- rnorm(n_samples*n_features_two, 0, sigma) # noise
       omic.two[[length(omic.two) + 1]] <- matrix(data.2, n_samples, n_features_two) + matrix(eps2, n_samples, n_features_two) # signal + noise
@@ -724,7 +1058,10 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         concatenated_data <- cbind(simulated_datasets$object.two[[i]],simulated_datasets$object.one[[i]])
         concatenated_datasets[[i]] <- concatenated_data
       }
-      sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
+      signal_annotation = list(samples = assigned_indices_samples, omic.one = assigned_indices_features, omic.two = assigned_indices_features_omic.two)
+      sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, signal_annotation = signal_annotation, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+
+      #sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
       return(sim_output)
 
     }else if (type.factor==""){
@@ -744,7 +1081,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           # Assigning the signal to the selected indices
           for (i in seq_along(alpha)) {
             indices <- assigned_indices_samples#[[i]]
-            alpha[[i]][indices] <- rnorm(length(indices), (3 + 0.5*i), 0.05)  # Adjust values dynamically
+            alpha[[i]][indices] <- rnorm(length(indices), (signal.samples[1] + 0.5*i), signal.samples[2])  # Adjust values dynamically
           }
 
           # # First OMIC data
@@ -762,7 +1099,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           # Assign corresponding values to betas variables based on assigned_indices_features
           for (i in all_indices) {
             indices <- assigned_indices_features[[i]]
-            beta[[i]][indices] <- rnorm(length(indices), (4.0 + 0.5 * i), 0.05)  # Adjust values dynamically
+            beta[[i]][indices] <- rnorm(length(indices), (signal.features.one[1] + 0.5 * i), signal.features.one[2])  # Adjust values dynamically
           }
 
           pattern_alpha <-"^alpha\\d+"
@@ -788,7 +1125,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           omic.one <- list()
 
           # Noise in the first detasets
-          sigma <- sigmas_vector[1]
+          sigma <- (signal.samples[1]*signal.features.one[1])/snr#sigmas_vector[1]
 
           eps1 <- rnorm(n_samples*n_features_one, 0, sigma) # noise
           omic.one[[length(omic.one) + 1]] <- matrix(data.1, n_samples, n_features_one) + matrix(eps1, n_samples, n_features_one) # signal + noise
@@ -813,7 +1150,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           # Assign corresponding values to betas variables based on assigned_indices_features
           for (i in all_indices) {
             indices <- assigned_indices_features_omic.two[[i]]
-            delta[[i]][indices] <- rnorm(length(indices), 0, 0.05)  # Adjust values dynamically
+            delta[[i]][indices] <- rnorm(length(indices), 0, signal.features.two[2])  # Adjust values dynamically
           }
 
           pattern_gamma <-"^alpha\\d+"
@@ -839,7 +1176,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           omic.two <- list()
 
           # Noise in the second detasets
-          sigma <- sigmas_vector[2]
+          sigma <- (signal.samples[1]*signal.features.two[1])/snr#sigmas_vector[2]
 
           eps2 <- rnorm(n_samples*n_features_two, 0, sigma) # noise
           omic.two[[length(omic.two) + 1]] <- matrix(data.2, n_samples, n_features_two) + matrix(eps2, n_samples, n_features_two) # signal + noise
@@ -855,7 +1192,10 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
             concatenated_data <- cbind(simulated_datasets$object.two[[i]],simulated_datasets$object.one[[i]])
             concatenated_datasets[[i]] <- concatenated_data
           }
-          sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
+          signal_annotation = list(samples = assigned_indices_samples, omic.one = assigned_indices_features, omic.two = assigned_indices_features_omic.two)
+          sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, signal_annotation = signal_annotation, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+
+          #sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
           return(sim_output)
 
         }else if (selected.omic == 'omic.two') {
@@ -867,7 +1207,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           # Assigning the signal to the selected indices
           for (i in seq_along(alpha)) {
             indices <- assigned_indices_samples#[[i]]
-            alpha[[i]][indices] <- rnorm(length(indices), (3 + 0.5*i), 0.05)  # Adjust values dynamically
+            alpha[[i]][indices] <- rnorm(length(indices), (signal.samples[1] + 0.5*i), signal.samples[2])  # Adjust values dynamically
           }
 
 
@@ -884,7 +1224,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           # Assign corresponding values to betas variables based on assigned_indices_features
           for (i in all_indices) {
             indices <- assigned_indices_features[[i]]
-            beta[[i]][indices] <- rnorm(length(indices), 0, 0.05)  # Adjust values dynamically
+            beta[[i]][indices] <- rnorm(length(indices), 0, signal.features.one[2])  # Adjust values dynamically
           }
 
           pattern_alpha <-"^alpha\\d+"
@@ -910,7 +1250,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           omic.one <- list()
 
           # Noise in the first detasets
-          sigma <- sigmas_vector[1]
+          sigma <- (signal.samples[1]*signal.features.one[1])/snr#sigmas_vector[1]
 
           eps1 <- rnorm(n_samples*n_features_one, 0, sigma) # noise
           omic.one[[length(omic.one) + 1]] <- matrix(data.1, n_samples, n_features_one) + matrix(eps1, n_samples, n_features_one) # signal + noise
@@ -946,7 +1286,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
             # Check if indices are numeric and not empty
             if (length(indices) > 0 && is.numeric(indices)) {
               # Assign random values to delta[[i]] at the specified indices
-              delta[[i]][indices] <- rnorm(length(indices), 7 + 0.05 * i, 0.05)  # Adjust values dynamically
+              delta[[i]][indices] <- rnorm(length(indices), (signal.features.two[1] + 0.05 * i), signal.features.two[2])  # Adjust values dynamically
             } else {
               warning(paste("Invalid or empty indices for iteration:", i))
             }
@@ -975,7 +1315,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           omic.two <- list()
 
           # Noise in the second detasets
-          sigma <- sigmas_vector[2]
+          sigma <- (signal.samples[1]*signal.features.two[1])/snr#sigmas_vector[2]
 
           eps2 <- rnorm(n_samples*n_features_two, 0, sigma) # noise
           omic.two[[length(omic.two) + 1]] <- matrix(data.2, n_samples, n_features_two) + matrix(eps2, n_samples, n_features_two) # signal + noise
@@ -989,7 +1329,10 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
             concatenated_data <- cbind(simulated_datasets$object.two[[i]],simulated_datasets$object.one[[i]])
             concatenated_datasets[[i]] <- concatenated_data
           }
-          sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
+          signal_annotation = list(samples = assigned_indices_samples, omic.one = assigned_indices_features, omic.two = assigned_indices_features_omic.two)
+          sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, signal_annotation = signal_annotation, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+
+          #sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
           return(sim_output)
         }
       }else if (selected.factor == 'shared'){
@@ -1001,7 +1344,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         # Assigning the signal to the selected indices
         for (i in seq_along(alpha)) {
           indices <- assigned_indices_samples
-          alpha[[i]][indices] <- rnorm(length(indices), (3 + 0.5*i), 0.05)  # Adjust values dynamically
+          alpha[[i]][indices] <- rnorm(length(indices), (signal.samples[1] + 0.5*i), signal.samples[2])  # Adjust values dynamically
         }
 
         # First OMIC data
@@ -1036,7 +1379,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         #all_indices <- seq_along(assigned_indices_features)
         for (i in seq_along(num)) {
           indices <- assigned_indices_features#[[i]]
-          beta[[i]][indices] <- rnorm(length(indices), (4.0 + 0.5 * i), 0.05)  # Adjust values dynamically
+          beta[[i]][indices] <- rnorm(length(indices), (signal.features.one[1] + 0.5 * i), signal.features.one[2])  # Adjust values dynamically
         }
 
         pattern_alpha <-"^alpha\\d+"
@@ -1062,7 +1405,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         omic.one <- list()
 
         # Noise in the first detasets
-        sigma <- sigmas_vector[1]
+        sigma <- (signal.samples[1]*signal.features.one[1])/snr#sigmas_vector[1]
 
         eps1 <- rnorm(n_samples*n_features_one, 0, sigma) # noise
         omic.one[[length(omic.one) + 1]] <- matrix(data.1, n_samples, n_features_one) + matrix(eps1, n_samples, n_features_one) # signal + noise
@@ -1112,7 +1455,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           # Check if indices is not empty after removing NAs
           if (length(indices) > 0) {
             # Assign values to delta[[i]] at the specified indices
-            delta[[i]][indices] <- rnorm(length(indices), 8 + 0.05 * i, 0.05)  # Adjust values dynamically
+            delta[[i]][indices] <- rnorm(length(indices), (signal.features.two + 0.05 * i), signal.features.two[2])  # Adjust values dynamically
           } else {
             warning(paste("No valid indices for iteration:", i)) # Optional warning if indices are empty
           }
@@ -1141,7 +1484,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         omic.two <- list()
 
         # Noise in the second detasets
-        sigma <- sigmas_vector[2]
+        sigma <- (signal.samples[1]*signal.features.two[1])/snr #sigmas_vector[2]
 
         eps2 <- rnorm(n_samples*n_features_two, 0, sigma) # noise
         omic.two[[length(omic.two) + 1]] <- matrix(data.2, n_samples, n_features_two) + matrix(eps2, n_samples, n_features_two) # signal + noise
@@ -1155,7 +1498,10 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
           concatenated_data <- cbind(simulated_datasets$object.two[[i]],simulated_datasets$object.one[[i]])
           concatenated_datasets[[i]] <- concatenated_data
         }
-        sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
+        signal_annotation = list(samples = assigned_indices_samples, omic.one = assigned_indices_features, omic.two = assigned_indices_features_omic.two)
+        sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, signal_annotation = signal_annotation, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+
+        #sim_output <- return(list(concatenated_datasets = concatenated_datasets, divide_samples = divide_samples, assigned_indices_features=assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, list_alphas=alpha, list_gammas=gamma, list_betas=beta, list_deltas=delta))
         return(sim_output)
       }
     }
@@ -1168,7 +1514,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       n_features_two <- vector_features[2]
 
       # Noise in the first detasets
-      sigmas <- sigmas_vector[1]
+      sigmas <- (signal.samples[1]*signal.features.one[1])/snr #sigmas_vector[1]
 
       #num_factor = num_factors
       omic.one <- list()
@@ -1212,7 +1558,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       # Assign corresponding values to alpha variables based on assigned_indices_samples
       for (i in seq_along(assigned_indices_samples)) {
         indices <- assigned_indices_samples[[i]]
-        list_alphas[[i]][indices] <- rnorm(length(indices), (3 + 0.5*i), 0.05)  # Adjust values dynamically
+        list_alphas[[i]][indices] <- rnorm(length(indices), (signal.samples[1] + 0.5*i), signal.samples[2])  # Adjust values dynamically
       }
       list_gammas <- list_alphas
       # Add the separated list of the indices selected for omics of multiple features
@@ -1287,7 +1633,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
             list_betas[[i]] <- numeric(max(indices_ns))
           }
           # Assign values to the appropriate indices in list_betas
-          list_betas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = (5.0 + 0.4 * i), sd = 0.05)
+          list_betas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = (signal.features.one[1] + 0.4 * i), sd = signal.features.one[2])
         }
       }
 
@@ -1343,7 +1689,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       ### * * * * * * * * * * * * * * * * * * * * ** * * * * Second OMIC data * * * * * * * * * * * * * * * * * * * * * * * * * *
 
       # Noise in the first detasets
-      sigmas <- sigmas_vector[2]
+      sigmas <- (signal.samples[1]*signal.features.two[1])/snr#sigmas_vector[2]
 
       # Generate random gamma values based on the max_factors
       # Replace 'alpha' with 'gamma' in the names of list_gammas
@@ -1381,7 +1727,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
             length(list_deltas[[i]]) <- max(indices_ns)
           }
           # Assign values to the appropriate indices in list_deltas
-          list_deltas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = (5.0 + 0.4 * i), sd = 0.05)
+          list_deltas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = (signal.features.two[1] + 0.4 * i), sd = signal.features.two[2])
         }
       }
 
@@ -1441,8 +1787,9 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         concatenated_datasets[[i]] <- concatenated_data
       }
 
-      # sim_output <- list(concatenated_datasets = concatenated_datasets, list_alphas = list_alphas, list_betas = list_betas, list_gammas = list_gammas, list_deltas = list_deltas)#simulated_datasets=simulated_datasets)
-      sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, assigned_indices_samples = assigned_indices_samples, assigned_indices_features = assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+      signal_annotation = list(samples = assigned_indices_samples, omic.one = assigned_indices_features, omic.two = assigned_indices_features_omic.two)
+      sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, signal_annotation = signal_annotation, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+      #sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, assigned_indices_samples = assigned_indices_samples, assigned_indices_features = assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
 
       return(sim_output)
 
@@ -1454,7 +1801,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       n_features_two <- vector_features[2]
 
       # Noise in the first detasets
-      sigmas <- sigmas_vector[1]
+      sigmas <- (signal.samples[1]*signal.features.one[1])/snr#sigmas_vector[1]
 
       #num_factor = num_factors
       omic.one <- list()
@@ -1476,7 +1823,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       # Assign corresponding values to alpha variables based on assigned_indices_samples
       for (i in seq_along(assigned_indices_samples)) {
         indices <- assigned_indices_samples[[i]]
-        list_alphas[[i]][indices] <- rnorm(length(indices), (3 + 0.5*i), 0.05)  # Adjust values dynamically
+        list_alphas[[i]][indices] <- rnorm(length(indices), (signal.samples[1] + 0.5*i), signal.samples[2])  # Adjust values dynamically
       }
       list_gammas <- list_alphas
       # Add the separated list of the indices selected for omics of multiple features
@@ -1555,7 +1902,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
             list_betas[[i]] <- numeric(max(indices_ns))
           }
           # Assign values to the appropriate indices in list_betas
-          list_betas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = (5.0 + 0.4 * i), sd = 0.05)
+          list_betas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = (signal.features.one[1] + 0.4 * i), sd = signal.features.one[2])
         }
       }
 
@@ -1611,7 +1958,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       ### * * * * * * * * * * * * * * * * * * * * ** * * * * Second OMIC data * * * * * * * * * * * * * * * * * * * * * * * * * *
 
       # Noise in the first detasets
-      sigmas <- sigmas_vector[2]
+      sigmas <- (signal.samples[1]*signal.features.two[1])/snr#sigmas_vector[2]
 
       # Generate random gamma values based on the max_factors
       list_gammas <- list_alphas
@@ -1645,7 +1992,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
             list_deltas[[i]] <- numeric(max(indices_ns))
           }
           # Assign values to the appropriate indices in list_deltas
-          list_deltas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = 0, sd = 0.05)
+          list_deltas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = 0, sd = signal.features.two[2])
         }
       }
 
@@ -1706,8 +2053,9 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         concatenated_datasets[[i]] <- concatenated_data
       }
 
-      # sim_output <- list(concatenated_datasets = concatenated_datasets, list_alphas = list_alphas, list_betas = list_betas, list_gammas = list_gammas, list_deltas = list_deltas)#simulated_datasets=simulated_datasets)
-      sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, assigned_indices_samples = assigned_indices_samples, assigned_indices_features = assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+      signal_annotation = list(samples = assigned_indices_samples, omic.one = assigned_indices_features, omic.two = assigned_indices_features_omic.two)
+      sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, signal_annotation = signal_annotation, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+      #sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, assigned_indices_samples = assigned_indices_samples, assigned_indices_features = assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
 
       return(sim_output)
 
@@ -1719,7 +2067,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       n_features_two <- vector_features[2]
 
       # Noise in the first detasets
-      sigmas <- sigmas_vector[1]
+      sigmas <- (signal.samples[1]*signal.features.one[1])/snr #sigmas_vector[1]
 
       #num_factor = num_factors
       omic.one <- list()
@@ -1741,7 +2089,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       # Assign corresponding values to alpha variables based on assigned_indices_samples
       for (i in seq_along(assigned_indices_samples)) {
         indices <- assigned_indices_samples[[i]]
-        list_alphas[[i]][indices] <- rnorm(length(indices), (3 + 0.5*i), 0.05)  # Adjust values dynamically
+        list_alphas[[i]][indices] <- rnorm(length(indices), (signal.samples[1] + 0.5*i), signal.samples[2])  # Adjust values dynamically
       }
       list_gammas <- list_alphas
       # Add the separated list of the indices selected for omics of multiple features
@@ -1816,7 +2164,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
             list_betas[[i]] <- numeric(max(indices_ns))
           }
           # Assign values to the appropriate indices in list_betas
-          list_betas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = 0, sd = 0.05)
+          list_betas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = 0, sd = signal.features.one[2])
         }
       }
 
@@ -1873,7 +2221,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       ### * * * * * * * * * * * * * * * * * * * * * * * Second OMIC data * * * * * * * * * * * * * * * * * * * * * *
 
       # Noise in the first detasets
-      sigmas <- sigmas_vector[2]
+      sigmas <- (signal.samples[1]*signal.features.two[1])/snr #sigmas_vector[2]
 
       # Generate random gamma values based on the max_factors
       list_gammas <- list_alphas
@@ -1911,7 +2259,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
             length(list_deltas[[i]]) <- max(indices_ns)
           }
           # Assign values to the appropriate indices in list_deltas
-          list_deltas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = (5.0 + 0.4 * i), sd = 0.05)
+          list_deltas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = (signal.features.two[1] + 0.4 * i), sd = signal.features.two[2])
         }
       }
 
@@ -1972,8 +2320,9 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         concatenated_datasets[[i]] <- concatenated_data
       }
 
-      # sim_output <- list(concatenated_datasets = concatenated_datasets, list_alphas = list_alphas, list_betas = list_betas, list_gammas = list_gammas, list_deltas = list_deltas)#simulated_datasets=simulated_datasets)
-      sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, assigned_indices_samples = assigned_indices_samples, assigned_indices_features = assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+      signal_annotation = list(samples = assigned_indices_samples, omic.one = assigned_indices_features, omic.two = assigned_indices_features_omic.two)
+      sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, signal_annotation = signal_annotation, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+      #sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, assigned_indices_samples = assigned_indices_samples, assigned_indices_features = assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
 
       return(sim_output)
 
@@ -1985,7 +2334,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       n_features_two <- vector_features[2]
 
       # Noise in the first detasets
-      sigmas <- sigmas_vector[1]
+      sigmas <- (signal.samples[1]*signal.features.one[1])/snr #sigmas_vector[1]
 
       #num_factor = num_factors
       omic.one <- list()
@@ -2007,7 +2356,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       # Assign corresponding values to alpha variables based on assigned_indices_samples
       for (i in seq_along(assigned_indices_samples)) {
         indices <- assigned_indices_samples[[i]]
-        list_alphas[[i]][indices] <- rnorm(length(indices), (3 + 0.5*i), 0.05)  # Adjust values dynamically
+        list_alphas[[i]][indices] <- rnorm(length(indices), (signal.samples[1] + 0.5*i), signal.samples[2])  # Adjust values dynamically
       }
       list_gammas <- list_alphas
       # Add the separated list of the indices selected for omics of multiple features
@@ -2085,7 +2434,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
             list_betas[[i]] <- numeric(max(indices_ns))
           }
           # Assign values to the appropriate indices in list_betas
-          list_betas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = (5.0 + 0.4 * i), sd = 0.05)
+          list_betas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = (signal.features.one[1] + 0.4 * i), sd = signal.features.one[2])
         }
       }
 
@@ -2141,7 +2490,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
       ### * * * * * * * * * * * * * * * * * * * * ** * * * * Second OMIC data * * * * * * * * * * * * * * * * * * * * * * * * * *
 
       # Noise in the first detasets
-      sigmas <- sigmas_vector[2]
+      sigmas <- (signal.samples[1]*signal.features.two[1])/snr#sigmas_vector[2]
 
       # Generate random gamma values based on the max_factors
       #list_gammas <- list_alphas
@@ -2180,7 +2529,7 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
             length(list_deltas[[i]]) <- max(indices_ns)
           }
           # Assign values to the appropriate indices in list_deltas
-          list_deltas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = (5.0 + 0.4 * i), sd = 0.05)
+          list_deltas[[i]][indices_ns] <- rnorm(length(indices_ns), mean = (signal.features.two[1] + 0.4 * i), sd = signal.features.two[2])
         }
       }
 
@@ -2239,23 +2588,33 @@ OmixCraftHD <- function(vector_features = c(2000,2000), n_samples = 50, sigmas_v
         concatenated_data <- cbind(simulated_datasets$object.two[[i]],simulated_datasets$object.one[[i]])
         concatenated_datasets[[i]] <- concatenated_data
       }
-
-      # sim_output <- list(concatenated_datasets = concatenated_datasets, list_alphas = list_alphas, list_betas = list_betas, list_gammas = list_gammas, list_deltas = list_deltas)#simulated_datasets=simulated_datasets)
-      sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, assigned_indices_samples = assigned_indices_samples, assigned_indices_features = assigned_indices_features, assigned_indices_features_omic.two=assigned_indices_features_omic.two, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
+      signal_annotation = list(samples = assigned_indices_samples, omic.one = assigned_indices_features, omic.two = assigned_indices_features_omic.two)
+      sim_output <- list(concatenated_datasets=concatenated_datasets, omic.one=omic.one, omic.two=omic.two, signal_annotation = signal_annotation, factor_xtics=factor_xtics, list_alphas=list_alphas, list_gammas=list_gammas, list_betas=list_betas, list_deltas=list_deltas)#simulated_datasets=simulated_datasets)
 
       return(sim_output)
     }
   }else{
-      message <- "Error: If 'num.factor' must be provided with 'single' or 'multiple'"
-      print(message) # Display message immediately
-      return(message)
+    message <- "Error: If 'num.factor' must be provided with 'single' or 'multiple'"
+    print(message) # Display message immediately
+    return(message)
   }
 }
 
 # Testing
 #set.seed(123)
-#output_sim <- OmixCraftHD(vector_features = c(2000,3000), sigmas_vector=c(8,5), n_samples=100,
-#                          n_factors=5, num.factor='multiple', advanced_dist='mixed')
+#output_sim <- OmixCraftHD(vector_features = c(4000,3000),
+#                          n_samples=100,
+#                          n_factors=2,
+#                          signal.samples = NULL,
+#                          signal.features.one = NULL,
+#                          signal.features.two = NULL,
+#                          snr = 2.5,
+#                          num.factor='multiple',
+#                          advanced_dist='mixed')
 #output_sim$factor_xtics
 #plot_simData(output_sim, type = 'heatmap')
 #plot_factor(1)
+# @importFrom MOFA2 create_mofa run_mofa prepare_mofa
+# @importFrom MOFA2 get_default_model_options get_default_data_options
+# @importFrom MOFA2 get_default_training_options plot_factor_cor
+# @importFrom MOFA2 plot_variance_explained get_factors get_weights

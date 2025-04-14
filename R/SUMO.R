@@ -1,20 +1,22 @@
-#' SUMO: A Package for Simulating Multi-omics Data
+#' SUMO: Simulation Utilities for Multi-Omics Data
 #'
-#' SUMO provides tools for simulating complex multi-omics data, allowing researchers to generate datasets that reflect the biological intricacies found in real-world data. This package aims to fill a gap in current omics research by providing users with flexible and customizable tools for generating synthetic data that can be used for method development, benchmarking of Multi-Omics methods.
+#' It provides tools for simulating complex multi-omics datasets, enabling researchers to generate data that mirrors the biological intricacies observed in real-world omics studies. This package addresses a critical gap in current bioinformatics by offering flexible and customizable methods for synthetic multi-omics data generation, supporting method development, validation, and benchmarking.
 #'
-#' Key features of SUMO include:
-#' - **Simulating Multi-Omics Data**: Generate multi-layered datasets with customizable structures.
-#' - **Flexible Data Generation**: Control over various simulation parameters such as the sample, noise levels, and signal positions.
-# - **Integration with Analysis Pipelines**: Designed to easily integrate with existing multi-omics analysis workflows, allowing for seamless benchmarking of new methods.
-#' - **Visualization Tools**: Functions to visualize simulated data, including scatterplots, histogram, heatmaps and 3D visualization.
+#' **Key Features:**
+#' - **Multi-Omics Simulation**: Generate multi-layered datasets with shared and modality-specific structures.
+#' - **Flexible Generation Engine**: Fine control over samples, noise levels, signal distributions, and latent factor structures.
+#' - **Pipeline-Friendly Design**: Seamlessly integrates with existing multi-omics analysis workflows and packages (e.g., `SummarizedExperiment`, `MultiAssayExperiment`).
+#' - **Visualization Tools**: Built-in plotting functions for exploring synthetic signals, factor structures, and noise.
 #'
-#' Key functions include:
-#' - `OmixCraftHD()`: Generates synthetic multi-omics datasets based on user-defined parameters.
-#' - `plot_simData`: Visualizes the structure of the generated data
-#' - `plot_factor`: Visualizes the raw factor scores, for visual identification of signal noise
-#' - `plot_weights`: Visualizes the raw features loadings, for visual identification of signal noise
+#' **Main Functions:**
+#' - `OmixCraftHD()`: Simulates synthetic high-dimensional multi-omics datasets.
+#' - `plot_simData()`: Visualizes generated data at different levels.
+#' - `plot_factor()`: Displays factor scores across samples for signal inspection.
+#' - `plot_weights()`: Visualizes feature loadings to assess signal versus noise.
+#' - `demo_multiomics_analysis()`: Full demo function for applying MOFA on SUMO-generated or real-world data.
+#' - `compute_means_vars()`: Estimate parameters from the real experimental dataset.
 #'
-#  @docType package
+#' @docType package
 #' @name SUMO
-#' @keywords internal
+#' @keywords benchmarking multi-omics models
 "_PACKAGE"
