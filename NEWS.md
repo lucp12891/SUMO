@@ -1,33 +1,53 @@
-## SUMO 0.2.0
+## SUMO 1.2.0
 
-### 🔧 Major Enhancements
-- Introduced `demo_multiomics_analysis()` for end-to-end demonstration of MOFA-based integrative analysis using both SUMO-generated and real-world datasets (e.g., CLL).
-- Added PowerPoint reporting with automatic visualization export using `officer` and `rvg`.
+### 🧪 Major Simulation Engine Upgrade
 
-### 🆕 New Functions
-- `compute_means_vars()`: Computes sample- and feature-level statistics for benchmarking and noise calibration across multiple omics datasets.
-- `plot_weights()`: Refactored with modular plotting helpers and new options for:
-  - `show.legend` (toggle legend)
-  - `"integrated"` mode (combined view of both omics)
-  - Signal region annotation from `sim_object$signal_annotation`
-- `plot_factor()`: Now supports both scatter and histogram visualization of factor scores. Includes support for plotting all factors and controlling legend display.
+* ✅ **Support for simulating >2 omics datasets:** A core feature upgrade enabling generation of multi-omics datasets with **three or more layers**, such as transcriptomics, proteomics, and metabolomics, in a single simulation run.
+* 🔄 **Function renamed for clarity:**
 
-### 🎨 Visualization Improvements
-- Modularized plotting into helper functions (`build_scatter_plot()`, `build_histogram_plot()`).
-- Added consistent theming, Viridis color scales, and better axis labeling across plots.
-- Improved annotation of signal-vs-noise regions for clarity in benchmarking.
+  * Previous: `OmixCraftHD` → Now: `simulate_twoOmicsData` (for 2-omics simulation).
+  * New: `OmixCraftMultiHD` (alias `simulateMultOmics`) introduced to simulate an **arbitrary number of omics** using the same generative framework.
+* 💡 Non-overlapping latent factors with flexible per-omic and per-factor signal regions are now seamlessly handled for multiple datasets.
 
-### 🧪 Simulation Engine Upgrades
-- Updated `OmixCraftHD()` to support:
-  - Per-factor specification of means and variances for samples and features (e.g., `signal.samples = c(3, 0.5)`)
-  - Automatic derivation of signal masks used for evaluation and annotation
-- Better error handling and defaults for edge cases (e.g., NULL factors)
+### 🧬 Factor Model Design Enhancements
 
-### 🧼 Internal Cleanup
-- Removed deprecated argument `signal_vector`
-- Added `globalVariables()` suppressions for clean CRAN checks
-- Improved code readability and consistency across plotting functions
+* Fully **modular generative factor model** allows:
+
+  * Signal assignment via latent factors per omic.
+  * `num.factor = "single"` or `"multiple"` control.
+  * `factor_structure` for each factor: `shared`, `unique`, `mixed`, or `partial`.
+* Sample blocks and feature blocks are now simulated with **sequential, non-overlapping indices**, respecting biological plausibility and avoiding signal bleed.
+
+### 🛠️ Refinements and Validation
+
+* Robust input checks ensure valid parameterization for complex simulation designs.
+* All alpha (sample score) vectors and beta (feature weight) vectors now support sparse signal encoding and customized signal-to-noise ratios (`snr`).
+* Each omics layer can be assigned its own mean and standard deviation for signal blocks, increasing realism.
+
+### 📈 Documentation and Usability
+
+* Improved documentation and usage examples for:
+
+  * `simulateMultiOmics()`
+  * Factor assignment logic and feature-sample block allocation
+* Example usage includes:
+
+  ```r
+  sim_object <- simulateMultiOmics(
+    vector_features = c(3000, 2500, 2000),
+    n_samples = 100,
+    n_factors = 3,
+    snr = 3,
+    signal.samples = c(5, 1),
+    signal.features = list(c(3, 0.3), c(2.5, 0.25), c(2, 0.2)),
+    factor_structure = "mixed",
+    num.factor = "multiple",
+    seed = 123
+  )
+  ```
 
 ### 📦 Infrastructure
-- Package now includes robust examples for every major exported function
-- Improved documentation headers for `Roxygen2` and pkgdown compatibility
+
+* Full compatibility with `Roxygen2`, `pkgdown`, and `devtools::check()` (0 errors, 0 warnings, 0 notes).
+* Added CRAN-safe global variable declarations.
+

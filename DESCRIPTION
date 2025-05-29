@@ -1,6 +1,6 @@
 Package: SUMO
 Title: Generating Multi-Omics Datasets for Testing and Benchmarking
-Version: 0.2.0
+Version: 1.2.0
 Authors@R: 
     c(
       person("Bernard", "Isekah Osang'ir", email = "Bernard.Osangir@sckcen.be", role = c("aut", "cre"),
@@ -14,7 +14,7 @@ License: CC BY 4.0
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 LazyData: true
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.2
 Suggests: 
     testthat (>= 3.0.0),
     MOFAdata,
@@ -23,7 +23,8 @@ Suggests:
     fabia,
     tidyverse,
     grid,
-    basilisk
+    basilisk,
+    systemfonts,
 Config/testthat/edition: 3
 Imports:
     ggplot2,
@@ -40,17 +41,19 @@ Imports:
     magrittr,
     officer
 Collate: 
-    'divide_vector.R'
-    'divide_features_two.R'
-    'divide_features_one.R'
-    'feature_selection_two.R'
-    'feature_selection_one.R'
-    'divide_samples.R'
-    'OmixCraftHD.R'
     'SUMO.R'
     'compute_means_vars.R'
     'demo_multiomics_analysis.R'
+    'divide_vector.R'
+    'divide_features_one.R'
+    'divide_features_two.R'
+    'divide_samples.R'
+    'divide_samples_alternative.R'
+    'feature_selection_one.R'
+    'feature_selection_two.R'
     'globals.R'
     'plot_factor.R'
     'plot_simData.R'
     'plot_weights.R'
+    'simulateMultiOmics.R'
+    'simulate_twoOmicsData.R'
