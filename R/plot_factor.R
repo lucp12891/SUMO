@@ -1,7 +1,7 @@
 #' @name plot_factor
 #' @title Visualization of factor scores  (ground truth)
 #' @description Scatter or histogram plots of sample-level factor scores from simulated multi-omics data, using scores from list_alphas and list_gammas.
-#' @param sim_object R object containing simulated data output from OmixCraftHD
+#' @param sim_object R object containing simulated data output from `simulate_twoOmicsData` and `simulateMultiOmics`.
 #' @param factor_num Integer or "all". Which factor(s) to plot.
 #' @param type Character. Either "scatter" (default) or "histogram" for plot type.
 #' @param show.legend Logical. Whether to show legend in plots. Default is TRUE.
@@ -11,7 +11,7 @@
 #' @importFrom readr read_csv
 #' @importFrom stringr str_detect
 #' @examples
-#' output_obj <- OmixCraftHD(
+#' output_obj <- simulate_twoOmicsData(
 #'   vector_features = c(4000,3000),
 #'   n_samples = 100,
 #'   n_factors = 2,
@@ -24,7 +24,7 @@
 #' @export
 plot_factor <- function(sim_object = NULL, factor_num = NULL, type = "scatter", show.legend = TRUE) {
   if (is.null(sim_object) || is.null(factor_num)) {
-    sim_object <- OmixCraftHD(vector_features = c(2000,2000), n_samples = 50, sigmas_vector = c(3,5), n_factors = 3, num.factor = 'multiple')
+    sim_object <- simulate_twoOmicsData(vector_features = c(2000,2000), n_samples = 50, sigmas_vector = c(3,5), n_factors = 3, num.factor = 'multiple')
     factor_num <- 1
     message("Note: No input provided. Using default simulated data.\nFactor_num set to 1.")
   }

@@ -6,6 +6,8 @@
 #' @param n_samples number of samples
 #' @param num number of factors
 #' @param min_size Minimum length of any samples scores
+#' @importFrom utils head
+#' @importFrom stats var
 #' @export
 divide_samples <- function(n_samples, num, min_size) {
   if (num * min_size >= n_samples) {

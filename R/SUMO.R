@@ -9,7 +9,8 @@
 #' - **Visualization Tools**: Built-in plotting functions for exploring synthetic signals, factor structures, and noise.
 #'
 #' **Main Functions:**
-#' - `OmixCraftHD()`: Simulates synthetic high-dimensional multi-omics datasets.
+#' - `simulateMultiOmics()`: Simulates multiple (> two) high-dimensional multi-omics datasets.
+#' - `simulate_twoOmicsData()`: Simulates two high-dimensional multi-omics datasets.
 #' - `plot_simData()`: Visualizes generated data at different levels.
 #' - `plot_factor()`: Displays factor scores across samples for signal inspection.
 #' - `plot_weights()`: Visualizes feature loadings to assess signal versus noise.

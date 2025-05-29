@@ -15,7 +15,7 @@
 #' @importFrom stringr str_detect
 #' @importFrom rlang .data
 #' @examples
-#' output_obj <- OmixCraftHD(
+#' output_obj <- simulate_twoOmicsData(
 #'   vector_features = c(4000, 3000),
 #'   n_samples = 100,
 #'   n_factors = 2,

@@ -98,3 +98,6 @@ has_intersection <- function(lst) {
 
 # Print the result
 #print(result)
+
+
+#feature_selection_one(n_features_one = 5000, num.factor = "multiple", no_factor  = 3)
