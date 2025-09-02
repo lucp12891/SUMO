@@ -1,6 +1,6 @@
 Package: SUMO
 Title: Generating Multi-Omics Datasets for Testing and Benchmarking
-Version: 1.2.0
+Version: 1.2.1
 Authors@R: 
     c(
       person("Bernard", "Isekah Osang'ir", email = "Bernard.Osangir@sckcen.be", role = c("aut", "cre"),
