@@ -61,9 +61,22 @@ demo_multiomics_analysis <- function(data_type = c("SUMO", "real_world"), export
       snr = 0.5,
       multiomics_demo = "SHOW"
     )
+
+    # Create combined dataframe with custom sample names
+    sample_metaData <- data.frame(
+      sample = paste0("sample_", 1:sim_object[["n_samples"]])
+    )
+
+    # Loop to dynamically add signal columns
+    for (i in seq_along(sim_object[["indices_samples"]])) {
+      sample_metaData[[paste0("signal_Factor", i)]] <-
+        1:sim_object[["n_samples"]] %in% sim_object[["indices_samples"]][[i]]
+    }
+
     list(
       data = sim_object$concatenated_datasets,
-      n_features = list(one = sim_object$n_features_one, two = sim_object$n_features_two)
+      n_features = list(one = sim_object$n_features_one, two = sim_object$n_features_two),
+      sample_metaData = sample_metaData
     )
   }
 
@@ -145,6 +158,7 @@ demo_multiomics_analysis <- function(data_type = c("SUMO", "real_world"), export
       colnames(omic_data[[2]])
     )
     model <- run_mofa_analysis(omic_data, feature_names = feature_names)
+    samples_metadata(model) <- sumo$sample_metaData
     generate_visuals_and_report(model, "SUMO", export_pptx)
     invisible(model)
 

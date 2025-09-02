@@ -41,10 +41,19 @@ plot_simData <- function(sim_object, data = "merged", type = "heatmap") {
   dataset <- NULL
   feature_split <- NULL
 
+  # Fetch dataset
   if (data_lower %in% c("merged", "concatenated")) {
-    dataset <- sim_object$concatenated_datasets
+    if (!is.null(sim_object$iteration_1$concatenated_datasets)) {
+      dataset <- sim_object$iteration_1$concatenated_datasets
+    } else if (!is.null(sim_object$concatenated_datasets)) {
+      dataset <- sim_object$concatenated_datasets
+    } else {
+      stop("No concatenated dataset found in sim_object.")
+    }
+
     if (is.list(dataset)) dataset <- dataset[[1]]
     dataset <- t(dataset)
+
     if (!is.null(sim_object$omics)) {
       feature_split <- cumsum(sapply(sim_object$omics, ncol))
     }
@@ -52,9 +61,10 @@ plot_simData <- function(sim_object, data = "merged", type = "heatmap") {
     dataset <- sim_object$omics[[data]]
     dataset <- t(dataset)
   } else {
-    stop("Invalid `data` argument.")
+    stop("Invalid `data` argument. Provide 'merged', 'concatenated', or a valid omic layer name.")
   }
 
+  # Ensure matrix format
   if (!is.matrix(dataset)) {
     dataset <- as.matrix(dataset)
   }
@@ -86,4 +96,6 @@ plot_simData <- function(sim_object, data = "merged", type = "heatmap") {
   } else {
     stop("Invalid `type`. Choose 'heatmap'. 3D plot not support by this version now.")
   }
+
+  invisible(NULL)
 }
