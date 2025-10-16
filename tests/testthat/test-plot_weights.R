@@ -19,11 +19,12 @@ test_that("plot_weights runs without error", {
 
   test_factor <- available_factors[1]
 
+  output_obj = as_multiomics(output_obj)
   expect_silent(
     plot_weights(
       sim_object = output_obj,
       factor_num = test_factor,
-      data = "omic.one",
+      omic = 1,
       type = "scatter",
       show.legend = FALSE
     )

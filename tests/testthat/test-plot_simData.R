@@ -12,6 +12,9 @@ library(SUMO)  # Load your package
    snr = 2.5,
    num.factor='multiple',
    advanced_dist='mixed')
+
+output_obj = as_multiomics(output_obj)
+
 test_that("plot_simData runs without error", {
   # Test that the plot function runs without errors
   expect_silent(plot_simData(sim_object = output_obj, data = "merged", type = "heatmap"))
