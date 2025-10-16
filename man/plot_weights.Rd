@@ -2,39 +2,67 @@
 % Please edit documentation in R/plot_weights.R
 \name{plot_weights}
 \alias{plot_weights}
-\title{Visualizing the loading of the features}
+\title{Visualize feature loadings (weights)}
 \usage{
 plot_weights(
-  sim_object = NULL,
+  sim_object,
+  omic = 1,
   factor_num = 1,
-  data = "omic.one",
-  type = "scatter"
+  type = "scatter",
+  show.legend = TRUE
 )
 }
 \arguments{
-\item{sim_object}{R object containing data to be plotted}
+\item{sim_object}{A multi-omics object (e.g., from \code{simulate_twoOmicsData()}
+and \code{as_multiomics()}).}
 
-\item{factor_num}{Factor to be plotted.}
+\item{omic}{Integer or character. Which view to plot: \code{1} (omic.one),
+\code{2} (omic.two), or \code{"integrated"} (if present). Default \code{1}.}
 
-\item{data}{Section of the integrated data to be plotted, omic.one or omic.two are the options}
+\item{factor_num}{Integer or "all". Which factor(s) to visualize. Default \code{1}.}
 
-\item{type}{Type of plot. Scatter plot and histogram are the only allowed plots}
+\item{type}{Character. Plot type: \code{"scatter"} or \code{"histogram"}.
+Default \code{"scatter"}.}
+
+\item{show.legend}{Logical. Whether to show the legend. Default \code{TRUE}.}
+}
+\value{
+A \link[ggplot2]{ggplot} object (single plot) or a grob returned by
+\link[gridExtra]{grid.arrange} when multiple panels are combined.
 }
 \description{
-Visualizing the loading of the features
+Generate scatter or histogram plots of feature loadings (weights)
+from simulated or real multi-omics data. Supports per-omic views and, when
+available, an integrated view.
 }
 \examples{
-# Examples
-output_obj <- OmixCraftHD(
-  vector_features = c(2000,3000),
-  sigmas_vector=c(8,5),
-  n_samples=100,
-  n_factors=4,
-  num.factor='multiple',
-  advanced_dist='mixed'
+output_obj <- simulate_twoOmicsData(
+  vector_features = c(4000, 3000),
+  n_samples = 100,
+  n_factors = 2,
+  signal.samples = NULL,
+  signal.features.one = NULL,
+  signal.features.two = NULL,
+  snr = 2.5,
+  num.factor = "multiple",
+  advanced_dist = "mixed"
 )
-plot_weights(sim_object = output_obj, factor_num = 1, data = 'omic.one', type = 'scatter')
-plot_weights(sim_object = output_obj, factor_num = 1, data = 'omic.one', type = 'histogram')
-plot_weights(sim_object = output_obj, factor_num = 1, data = 'omic.two', type = 'scatter')
-plot_weights(sim_object = output_obj, factor_num = 1, data = 'omic.two', type = 'histogram')
+
+output_obj <- as_multiomics(output_obj)
+
+plot_weights(
+  sim_object = output_obj,
+  factor_num = 1,
+  omic = 1,
+  type = "scatter",
+  show.legend = FALSE
+)
+
+plot_weights(
+  sim_object = output_obj,
+  factor_num = 2,
+  omic = 2,
+  type = "histogram"
+)
+
 }

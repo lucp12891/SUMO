@@ -4,28 +4,41 @@
 \name{SUMO}
 \alias{SUMO-package}
 \alias{SUMO}
-\title{SUMO: A Package for Simulating Multi-omics Data}
+\title{SUMO: Simulation Utilities for Multi-Omics Data}
 \description{
-SUMO provides tools for simulating complex multi-omics data, allowing researchers to generate datasets that reflect the biological intricacies found in real-world data. This package aims to fill a gap in current omics research by providing users with flexible and customizable tools for generating synthetic data that can be used for method development, benchmarking of Multi-Omics methods.
+It provides tools for simulating complex multi-omics datasets, enabling researchers to generate data that mirrors the biological intricacies observed in real-world omics studies. This package addresses a critical gap in current bioinformatics by offering flexible and customizable methods for synthetic multi-omics data generation, supporting method development, validation, and benchmarking.
 }
 \details{
-Key features of SUMO include:
+\strong{Key Features:}
 \itemize{
-\item \strong{Simulating Multi-Omics Data}: Generate multi-layered datasets with customizable structures.
-\item \strong{Flexible Data Generation}: Control over various simulation parameters such as the sample, noise levels, and signal positions.
-\item \strong{Visualization Tools}: Functions to visualize simulated data, including scatterplots, histogram, heatmaps and 3D visualization.
+\item \strong{Multi-Omics Simulation}: Generate multi-layered datasets with shared and modality-specific structures.
+\item \strong{Flexible Generation Engine}: Fine control over samples, noise levels, signal distributions, and latent factor structures.
+\item \strong{Pipeline-Friendly Design}: Seamlessly integrates with existing multi-omics analysis workflows and packages (e.g., \code{SummarizedExperiment}, \code{MultiAssayExperiment}).
+\item \strong{Visualization Tools}: Built-in plotting functions for exploring synthetic signals, factor structures, and noise.
 }
 
-Key functions include:
+\strong{Main Functions:}
 \itemize{
-\item \code{OmixCraftHD()}: Generates synthetic multi-omics datasets based on user-defined parameters.
-\item \code{plot_simData}: Visualizes the structure of the generated data
-\item \code{plot_factor}: Visualizes the raw factor scores, for visual identification of signal noise
-\item \code{plot_weights}: Visualizes the raw features loadings, for visual identification of signal noise
+\item \code{simulateMultiOmics()}: Simulates multiple (> two) high-dimensional multi-omics datasets.
+\item \code{simulate_twoOmicsData()}: Simulates two high-dimensional multi-omics datasets.
+\item \code{plot_simData()}: Visualizes generated data at different levels.
+\item \code{plot_factor()}: Displays factor scores across samples for signal inspection.
+\item \code{plot_weights()}: Visualizes feature loadings to assess signal versus noise.
+\item \code{demo_multiomics_analysis()}: Full demo function for applying MOFA on SUMO-generated or real-world data.
+\item \code{compute_means_vars()}: Estimate parameters from the real experimental dataset.
 }
 }
 \author{
-\strong{Maintainer}: Bernard Isekah Osang'ir \email{bernard.osangir@uhasselt.be} (\href{https://orcid.org/0000-0002-5557-3602}{ORCID})
+\strong{Maintainer}: Bernard Isekah Osang'ir \email{Bernard.Osangir@sckcen.be} (\href{https://orcid.org/0000-0002-5557-3602}{ORCID})
+
+Other contributors:
+\itemize{
+  \item Ziv Shkedy [contributor]
+  \item Surya Gupta [contributor]
+  \item Jürgen Claesen [contributor]
+}
 
 }
-\keyword{internal}
+\keyword{benchmarking}
+\keyword{models}
+\keyword{multi-omics}

@@ -2,26 +2,36 @@
 % Please edit documentation in R/plot_factor.R
 \name{plot_factor}
 \alias{plot_factor}
-\title{Visualization of factor scores}
+\title{Visualization of factor scores  (ground truth)}
 \usage{
-plot_factor(sim_object = NULL, factor_num = NULL)
+plot_factor(
+  sim_object = NULL,
+  factor_num = NULL,
+  type = "scatter",
+  show.legend = TRUE
+)
 }
 \arguments{
-\item{sim_object}{R object containing data to be plotted}
+\item{sim_object}{R object containing simulated data output from \code{simulate_twoOmicsData} and \code{simulateMultiOmics}.}
 
-\item{factor_num}{Factor to be plotted.}
+\item{factor_num}{Integer or "all". Which factor(s) to plot.}
+
+\item{type}{Character. Either "scatter" (default) or "histogram" for plot type.}
+
+\item{show.legend}{Logical. Whether to show legend in plots. Default is TRUE.}
 }
 \description{
-Visualization of factor scores
+Scatter or histogram plots of sample-level factor scores from simulated multi-omics data, using scores from list_alphas and list_gammas.
 }
 \examples{
-# Examples
-output_obj <- OmixCraftHD(
-  vector_features = c(2000,3000),
-  sigmas_vector=c(3,4),
-  n_samples=30,
-  n_factors=1
-)
+output_obj <- simulate_twoOmicsData(
+  vector_features = c(4000,3000),
+  n_samples = 100,
+  n_factors = 2,
+  snr = 2.5,
+  num.factor = 'multiple',
+  advanced_dist = 'mixed')
+
 plot_factor(sim_object = output_obj, factor_num = 1)
-plot_factor(sim_object = output_obj, factor_num = 'all')
+plot_factor(sim_object = output_obj, factor_num = 'all', type = 'histogram')
 }

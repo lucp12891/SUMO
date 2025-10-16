@@ -2,28 +2,76 @@
 % Please edit documentation in R/plot_simData.R
 \name{plot_simData}
 \alias{plot_simData}
-\title{Visualizing the simulated data using image map and 3D visualization}
+\title{Visualize simulated multi-omics data as a heatmap}
 \usage{
-plot_simData(sim_object, type = "heatmap")
+plot_simData(
+  sim_object,
+  data = "merged",
+  type = "heatmap",
+  permute = FALSE,
+  permute_seed = NULL,
+  permute_samples = TRUE,
+  permute_features = TRUE
+)
 }
 \arguments{
-\item{sim_object}{R object containing simulated data to be plotted}
+\item{sim_object}{List-like simulation result. Must contain
+\code{omics}, a named list of numeric matrices (samples in rows, features in columns).}
 
-\item{type}{type of the plot. Heatmap for image plot and 3D for persp 3D plot}
+\item{data}{Character. Which matrix to visualize:
+\itemize{
+\item \code{"merged"} or \code{"concatenated"}: column-bind all omics (default: \code{"merged"}).
+\item a single omic name present in \code{names(sim_object$omics)}.
+}}
+
+\item{type}{Character. Plot type. Currently only \code{"heatmap"} is supported.}
+
+\item{permute}{Logical. If \code{TRUE}, apply permutations according to
+\code{permute_samples} and \code{permute_features}. Default: \code{FALSE}.}
+
+\item{permute_seed}{Integer or \code{NULL}. If not \code{NULL}, sets RNG seed \strong{once}
+for reproducible permutations. Default: \code{NULL}.}
+
+\item{permute_samples}{Logical. If \code{TRUE} and \code{permute = TRUE}, permute sample
+order (rows). Default: \code{TRUE}.}
+
+\item{permute_features}{Logical. If \code{TRUE} and \code{permute = TRUE}, permute feature
+order (columns). Default: \code{TRUE}.}
+}
+\value{
+Invisibly returns the numeric matrix that was plotted (after any permutations).
 }
 \description{
-Visualizing the simulated data using image map and 3D visualization
+Quick visualization of simulated omics data as a base R heatmap.
+You can plot the merged/concatenated matrix across all omics or a single
+omic layer. Optionally permute sample and/or feature order (with a seed)
+to conceal block structure for sanity checks.
+}
+\details{
+The function expects \code{sim_object$omics} to be a \strong{named list} of numeric
+matrices with the \strong{same number of rows} (samples). For \code{data = "merged"}
+(or \code{"concatenated"}), all omic matrices are column-bound in their current
+order (subject to optional permutation) and plotted together.
 }
 \examples{
-# Examples
-output_obj <- OmixCraftHD(
-  vector_features = c(2000,3000),
-  sigmas_vector=c(8,5),
-  n_samples=100,
-  n_factors=5,
-  num.factor='multiple',
-  advanced_dist='mixed'
+set.seed(123)
+sim_object <- simulate_twoOmicsData(
+  vector_features = c(4000, 3000),
+  n_samples = 100,
+  n_factors = 2,
+  snr = 2.5,
+  num.factor = "multiple",
+  advanced_dist = "mixed"
 )
-plot_simData(sim_object = output_obj, type = "heatmap")
-plot_simData(sim_object = output_obj, type = "3D")
+output_obj = as_multiomics(sim_object)
+
+# Merged (concatenated) heatmap
+plot_simData(output_obj, data = "merged", type = "heatmap")
+
+# Single omic with reproducible permutation
+plot_simData(output_obj, data = "omic2", permute = TRUE, permute_seed = 123)
+
+}
+\seealso{
+\code{simulateMultiOmics}
 }
