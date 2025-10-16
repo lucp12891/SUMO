@@ -1,101 +1,127 @@
 #' @name plot_simData
-#' @title Visualizing the simulated data using heatmap or 3D surface plot
-#' @description Generates a visual representation of the simulated omics data either as a heatmap or a 3D surface plot.
-#' You can select which dataset to visualize: the merged/concatenated matrix, or any individual omic (e.g., "omic1", "omic2", etc.).
+#' @title Visualize simulated multi-omics data as a heatmap
+#' @description
+#' Quick visualization of simulated omics data as a base R heatmap.
+#' You can plot the merged/concatenated matrix across all omics or a single
+#' omic layer. Optionally permute sample and/or feature order (with a seed)
+#' to conceal block structure for sanity checks.
 #'
-#' @param sim_object R object containing simulated data as returned by `simulate_twoOmicsData` and `simulateMultiOmics`.
-#' @param data Character. Specifies which data matrix to visualize. Options are "merged" (or "concatenated"), "omic.one", or "omic.two".
-#' @param type Character. Type of plot: either "heatmap" for a 2D image plot or "3D" for a 3D perspective surface plot.
-#' @importFrom graphics image persp abline rect legend
-#' @importFrom readxl read_excel
-#' @importFrom readr read_csv
-#' @importFrom stringr str_detect
+#' @details
+#' The function expects `sim_object$omics` to be a **named list** of numeric
+#' matrices with the **same number of rows** (samples). For `data = "merged"`
+#' (or `"concatenated"`), all omic matrices are column-bound in their current
+#' order (subject to optional permutation) and plotted together.
+#'
+#' @param sim_object List-like simulation result. Must contain
+#'   `omics`, a named list of numeric matrices (samples in rows, features in columns).
+#' @param data Character. Which matrix to visualize:
+#'   - `"merged"` or `"concatenated"`: column-bind all omics (default: `"merged"`).
+#'   - a single omic name present in `names(sim_object$omics)`.
+#' @param type Character. Plot type. Currently only `"heatmap"` is supported.
+#' @param permute Logical. If `TRUE`, apply permutations according to
+#'   `permute_samples` and `permute_features`. Default: `FALSE`.
+#' @param permute_seed Integer or `NULL`. If not `NULL`, sets RNG seed **once**
+#'   for reproducible permutations. Default: `NULL`.
+#' @param permute_samples Logical. If `TRUE` and `permute = TRUE`, permute sample
+#'   order (rows). Default: `TRUE`.
+#' @param permute_features Logical. If `TRUE` and `permute = TRUE`, permute feature
+#'   order (columns). Default: `TRUE`.
+#'
+#' @return Invisibly returns the numeric matrix that was plotted (after any permutations).
+#'
+#' @seealso \code{simulateMultiOmics}
+#'
 #' @examples
-# Simulate data
-#' output_obj <- simulateMultiOmics(
-#'   vector_features = c(3000, 2500, 2000),
+#' set.seed(123)
+#' sim_object <- simulate_twoOmicsData(
+#'   vector_features = c(4000, 3000),
 #'   n_samples = 100,
-#'   n_factors = 3,
-#'   snr = 3,
-#'   signal.samples = c(5, 1),
-#'   signal.features = list(
-#'     c(3, 0.3),
-#'     c(2.5, 0.25),
-#'     c(2, 0.2)
-#'   ),
-#'   factor_structure = "mixed",
+#'   n_factors = 2,
+#'   snr = 2.5,
 #'   num.factor = "multiple",
-#'   seed = 123
+#'   advanced_dist = "mixed"
 #' )
+#' output_obj = as_multiomics(sim_object)
 #'
-#' # Visualize merged heatmap
-#' plot_simData(sim_object = output_obj, data = "merged", type = "heatmap")
+#' # Merged (concatenated) heatmap
+#' plot_simData(output_obj, data = "merged", type = "heatmap")
 #'
-#' # Visualize omic2 in 3D
-#' plot_simData(sim_object = output_obj, data = "omic2", type = "heatmap")
+#' # Single omic with reproducible permutation
+#' plot_simData(output_obj, data = "omic2", permute = TRUE, permute_seed = 123)
 #'
 #' @export
-plot_simData <- function(sim_object, data = "merged", type = "heatmap") {
+#' @importFrom graphics image
+plot_simData <- function(sim_object,
+                         data = "merged",
+                         type = "heatmap",
+                         permute = FALSE,
+                         permute_seed = NULL,
+                         permute_samples = TRUE,
+                         permute_features = TRUE) {
+
   main_font_size <- 1
   data_lower <- tolower(data)
-  dataset <- NULL
-  feature_split <- NULL
+  M <- NULL
 
-  # Fetch dataset
+  if (!is.null(permute_seed)) set.seed(permute_seed)
+
+  # helper: coerce to numeric matrix
+  as_mat <- function(x) {
+    if (!is.matrix(x)) x <- as.matrix(x)
+    mode(x) <- "numeric"
+    x
+  }
+
+  # ---- Build matrix M --------------------------------------------------------
   if (data_lower %in% c("merged", "concatenated")) {
-    if (!is.null(sim_object$iteration_1$concatenated_datasets)) {
-      dataset <- sim_object$iteration_1$concatenated_datasets
-    } else if (!is.null(sim_object$concatenated_datasets)) {
-      dataset <- sim_object$concatenated_datasets
-    } else {
-      stop("No concatenated dataset found in sim_object.")
+    if (is.null(sim_object$omics) || length(sim_object$omics) == 0L) {
+      stop("No omics found in 'sim_object' for merged view.")
     }
+    omics <- sim_object$omics
 
-    if (is.list(dataset)) dataset <- dataset[[1]]
-    dataset <- t(dataset)
-
-    if (!is.null(sim_object$omics)) {
-      feature_split <- cumsum(sapply(sim_object$omics, ncol))
+    # ensure same number of samples across omics
+    n_rows <- vapply(omics, nrow, integer(1))
+    if (length(unique(n_rows)) != 1L) {
+      stop("All matrices in 'sim_object$omics' must have the same number of rows (samples).")
     }
+    n_samples <- n_rows[[1]]
+
+    # common sample permutation
+    row_perm <- if (isTRUE(permute && permute_samples)) sample.int(n_samples) else seq_len(n_samples)
+
+    # apply per-omic feature permutation and common sample permutation
+    omic_blocks <- lapply(omics, function(omic) {
+      omic <- as_mat(omic)  # samples x features
+      col_perm <- if (isTRUE(permute && permute_features)) sample.int(ncol(omic)) else seq_len(ncol(omic))
+      omic[row_perm, col_perm, drop = FALSE]
+    })
+
+    # merge features (column-bind)
+    M <- do.call(cbind, omic_blocks)
+
   } else if (!is.null(sim_object$omics) && data %in% names(sim_object$omics)) {
-    dataset <- sim_object$omics[[data]]
-    dataset <- t(dataset)
-  } else {
-    stop("Invalid `data` argument. Provide 'merged', 'concatenated', or a valid omic layer name.")
-  }
-
-  # Ensure matrix format
-  if (!is.matrix(dataset)) {
-    dataset <- as.matrix(dataset)
-  }
-
-  if (type == "heatmap") {
-    image(1:ncol(dataset), 1:nrow(dataset), t(dataset[nrow(dataset):1, ]),
-          xlab = "Samples", ylab = "Features", main = "", cex.main = main_font_size)
-
-    if (!is.null(feature_split) && data_lower %in% c("merged", "concatenated")) {
-      for (h in feature_split[-length(feature_split)]) {
-        abline(h = h, col = "brown", lty = "dashed")
-      }
+    M <- as_mat(sim_object$omics[[data]])  # samples x features
+    if (isTRUE(permute)) {
+      if (isTRUE(permute_samples))  M <- M[sample.int(nrow(M)), , drop = FALSE]
+      if (isTRUE(permute_features)) M <- M[, sample.int(ncol(M)), drop = FALSE]
     }
-
-    #} else if (type == "3D") {
-    #  if (!is.matrix(dataset) || !is.numeric(dataset)) {
-    #    stop("3D plotting requires a numeric matrix.")
-    #  }
-    #  if (nrow(dataset) < 2 || ncol(dataset) < 2) {
-    #    stop("3D plot requires at least a 2x2 matrix.")
-    #  }
-    #  if (anyNA(dataset)) {
-    #    stop("Dataset contains NA values which are not allowed in 3D plots.")
-    #  }
-    #
-    #  persp(x = 1:ncol(dataset), y = 1:nrow(dataset), z = dataset,
-    #        theta = 325, phi = 15, col = "yellow",
-    #        xlab = "", ylab = "Samples", zlab = "")
   } else {
-    stop("Invalid `type`. Choose 'heatmap'. 3D plot not support by this version now.")
+    stop("Invalid 'data' argument. Provide 'merged'/'concatenated' or a valid omic layer name.")
   }
 
-  invisible(NULL)
+  # ---- Plot ------------------------------------------------------------------
+  if (!identical(type, "heatmap")) {
+    stop("Invalid 'type'. Choose 'heatmap'.")
+  }
+
+  # image() expects z[i, j] at (x[i], y[j]); here x = samples (rows), y = features (cols)
+  graphics::image(x = seq_len(nrow(M)),
+                  y = seq_len(ncol(M)),
+                  z = M,
+                  xlab = "Samples",
+                  ylab = "Features",
+                  main = "",
+                  cex.main = main_font_size)
+
+  invisible(M)
 }

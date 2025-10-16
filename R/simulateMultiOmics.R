@@ -87,50 +87,50 @@ simulateMultiOmics <- function(
     n_factors,
     snr = 2,
     signal.samples = c(5, 0.05),
-    signal.features = NULL,
-    factor_structure = "mixed",
-    num.factor = "multiple",
+    signal.features = NULL,          # list length k; each = c(mean, sd)
+    factor_structure = "mixed",      # "shared","unique","mixed","partial","custom"
+    num.factor = "multiple",         # "multiple" or "single"
     seed = NULL,
     real_stats = FALSE,
-    real_means_vars = NULL
+    real_means_vars = NULL           # list length k; each = c(mean=..., var=...)
 ) {
   if (!is.null(seed)) set.seed(seed)
 
-  if (length(vector_features) < 2) stop("Provide at least 2 omics for SUMO simulation")
+  if (length(vector_features) < 2) stop("Provide at least 2 omics for simulation.")
   k <- length(vector_features)
-  if (!is.list(signal.features) || length(signal.features) != k) {
-    stop("signal.features must be a list of length equal to vector_features")
-  }
-  if (!num.factor %in% c("multiple", "single")) stop("num.factor must be either 'multiple' or 'single'")
-  if (!factor_structure %in% c("shared", "unique", "mixed", "partial", "custom")) stop("Invalid factor_structure option")
-  if (real_stats) {
-    if (is.null(real_means_vars) || length(real_means_vars) != k) {
-      stop("When real_stats = TRUE, provide real_means_vars = list(c(mean=..., var=...), ...) for each omic.")
-    }
+  if (!is.list(signal.features) || length(signal.features) != k)
+    stop("signal.features must be a list of length equal to vector_features.")
+  if (!num.factor %in% c("multiple", "single"))
+    stop("num.factor must be either 'multiple' or 'single'.")
+  if (!factor_structure %in% c("shared","unique","mixed","partial","custom"))
+    stop("Invalid factor_structure option.")
+  if (isTRUE(real_stats)) {
+    if (is.null(real_means_vars) || length(real_means_vars) != k)
+      stop("When real_stats = TRUE, provide real_means_vars list per omic with c(mean=..., var=...).")
   }
 
-  # Sample block assignment
+  ## -------- 1) Sample block assignment (per factor) --------
   assigned_indices_samples <- list()
   if (num.factor == "single") {
-    block_size <- sample(floor(0.15 * n_samples):ceiling(0.45 * n_samples), 1)
-    start_idx <- sample(1:(n_samples - block_size + 1), 1)
+    block_size <- sample(floor(0.15*n_samples):ceiling(0.45*n_samples), 1)
+    start_idx  <- sample(1:(n_samples - block_size + 1), 1)
     block <- start_idx:(start_idx + block_size - 1)
     assigned_indices_samples <- list(factor1 = block)
     n_factors <- 1
   } else {
-    used_indices <- c()
-    available_indices <- setdiff(1:n_samples, used_indices)
+    used_indices <- integer(0)
+    available_indices <- setdiff(seq_len(n_samples), used_indices)
     i <- 1
     while (i <= n_factors && length(available_indices) > 5) {
       block_size <- sample(5:min(ceiling(n_samples / n_factors) + 5, length(available_indices)), 1)
       possible_starts <- available_indices[available_indices + block_size - 1 <= max(available_indices)]
-      if (length(possible_starts) == 0) break
+      if (!length(possible_starts)) break
       start_idx <- sample(possible_starts, 1)
       block <- start_idx:(start_idx + block_size - 1)
       if (all(block %in% available_indices)) {
         assigned_indices_samples[[paste0("factor", i)]] <- block
         used_indices <- c(used_indices, block)
-        available_indices <- setdiff(1:n_samples, used_indices)
+        available_indices <- setdiff(seq_len(n_samples), used_indices)
         i <- i + 1
       } else {
         available_indices <- setdiff(available_indices, start_idx)
@@ -139,13 +139,13 @@ simulateMultiOmics <- function(
     while (i <= n_factors && length(available_indices) >= 5) {
       block_size <- sample(5:min(ceiling(n_samples / n_factors) + 5, length(available_indices)), 1)
       possible_starts <- available_indices[available_indices + block_size - 1 <= max(available_indices)]
-      if (length(possible_starts) == 0) break
+      if (!length(possible_starts)) break
       start_idx <- sample(possible_starts, 1)
       block <- start_idx:(start_idx + block_size - 1)
       if (all(block %in% available_indices)) {
         assigned_indices_samples[[paste0("factor", i)]] <- block
         used_indices <- c(used_indices, block)
-        available_indices <- setdiff(1:n_samples, used_indices)
+        available_indices <- setdiff(seq_len(n_samples), used_indices)
         i <- i + 1
       } else {
         available_indices <- setdiff(available_indices, start_idx)
@@ -154,48 +154,45 @@ simulateMultiOmics <- function(
     while (i <= n_factors) {
       fallback_size <- min(5, length(available_indices))
       if (fallback_size < 5) {
-        assigned_indices_samples[[paste0("factor", i)]] <- sample(1:n_samples, 5)
+        assigned_indices_samples[[paste0("factor", i)]] <- sample(seq_len(n_samples), 5)
       } else {
         fallback_start <- sample(available_indices[1:(length(available_indices) - fallback_size + 1)], 1)
         fallback_block <- fallback_start:(fallback_start + fallback_size - 1)
         assigned_indices_samples[[paste0("factor", i)]] <- fallback_block
         used_indices <- c(used_indices, fallback_block)
-        available_indices <- setdiff(1:n_samples, used_indices)
+        available_indices <- setdiff(seq_len(n_samples), used_indices)
       }
       i <- i + 1
     }
   }
 
-  # Map factors to omics
+  ## -------- 2) Map factors to omics --------
   factor_omic_map <- list()
   if (num.factor == "single") {
     if (factor_structure == "shared") {
-      factor_omic_map[["factor1"]] <- 1:k
+      factor_omic_map[["factor1"]] <- seq_len(k)
     } else if (factor_structure == "unique") {
-      factor_omic_map[["factor1"]] <- sample(1:k, 1)
+      factor_omic_map[["factor1"]] <- sample(seq_len(k), 1)
     } else if (factor_structure == "partial") {
-      factor_omic_map[["factor1"]] <- sort(sample(1:k, ifelse(k == 2, 2, sample(2:(k - 1), 1))))
-    } else {
-      stop("Invalid factor_structure for single factor.")
-    }
+      factor_omic_map[["factor1"]] <- sort(sample(seq_len(k), ifelse(k == 2, 2, sample(2:(k - 1), 1))))
+    } else stop("Invalid factor_structure for single factor.")
   } else {
-    for (i in 1:n_factors) {
+    for (i in seq_len(n_factors)) {
       if (factor_structure == "shared") {
-        factor_omic_map[[paste0("factor", i)]] <- 1:k
+        factor_omic_map[[paste0("factor", i)]] <- seq_len(k)
       } else if (factor_structure == "unique") {
-        factor_omic_map[[paste0("factor", i)]] <- sample(1:k, 1)
+        factor_omic_map[[paste0("factor", i)]] <- sample(seq_len(k), 1)
       } else if (factor_structure == "mixed") {
-        factor_omic_map[[paste0("factor", i)]] <- sort(sample(1:k, sample(1:k, 1)))
+        factor_omic_map[[paste0("factor", i)]] <- sort(sample(seq_len(k), sample(seq_len(k), 1)))
       } else if (factor_structure == "partial") {
-        factor_omic_map[[paste0("factor", i)]] <- sample(1:k, ifelse(k == 2, 2, sample(2:(k - 1), 1)))
-      } else {
-        stop("Custom factor_structure not supported yet.")
-      }
+        factor_omic_map[[paste0("factor", i)]] <- sample(seq_len(k), ifelse(k == 2, 2, sample(2:(k - 1), 1)))
+      } else stop("Custom factor_structure not supported yet.")
     }
   }
 
-  # Alphas (sample-level latent factors)
-  list_alphas <- list()
+  ## -------- 3) Sample-level latent factors (alphas) --------
+  list_alphas <- vector("list", n_factors)
+  names(list_alphas) <- paste0("alpha", seq_len(n_factors))
   for (i in seq_len(n_factors)) {
     alpha_vec <- numeric(n_samples)
     block <- assigned_indices_samples[[paste0("factor", i)]]
@@ -203,56 +200,81 @@ simulateMultiOmics <- function(
     alpha_vec[block] <- scores_block
     non_block <- setdiff(seq_len(n_samples), block)
     alpha_vec[non_block] <- rnorm(length(non_block), mean = 0, sd = 0.05)
-    list_alphas[[paste0("alpha", i)]] <- alpha_vec
+    list_alphas[[i]] <- alpha_vec
   }
 
-  # Create omics
+  ## -------- 4) Build omics + feature-level signals --------
   omic.list <- vector("list", k)
+  names(omic.list) <- paste0("omic", seq_len(k))
   list_betas <- vector("list", k)
   signal_annotation <- list(samples = assigned_indices_samples)
 
-  for (omic_idx in 1:k) {
-    n_features <- vector_features[omic_idx]
+  # NEW: store **indices** of signal features per omic/factor
+  feature_annotation <- vector("list", k)
+  names(feature_annotation) <- paste0("omic", seq_len(k))
+
+  for (omic_idx in seq_len(k)) {
+    n_features   <- vector_features[omic_idx]
     feature_mean <- signal.features[[omic_idx]][1]
-    feature_sd <- signal.features[[omic_idx]][2]
+    feature_sd   <- signal.features[[omic_idx]][2]
+
     omic_data <- matrix(0, nrow = n_samples, ncol = n_features)
     list_betas[[omic_idx]] <- list()
     used_feature_blocks <- list()
+    feature_annotation[[omic_idx]] <- list()
 
-    for (factor_i in 1:n_factors) {
+    for (factor_i in seq_len(n_factors)) {
       factor_name <- paste0("factor", factor_i)
       if (!(omic_idx %in% factor_omic_map[[factor_name]])) next
 
-      # Feature block helper
-      generate_sequential_feature_block <- function(available_indices, min_percent = 0.1, max_percent = 0.15, used_blocks = list()) {
+      # Helper: sequential, non-overlapping block of feature indices
+      generate_sequential_feature_block <- function(available_indices,
+                                                    min_percent = 0.1,
+                                                    max_percent = 0.15,
+                                                    used_blocks = list()) {
+        if (!length(available_indices)) return(integer(0))
         total_features <- max(available_indices)
         min_block_size <- max(5, ceiling(total_features * min_percent))
         max_block_size <- min(ceiling(total_features * max_percent), length(available_indices))
+        if (max_block_size < min_block_size) max_block_size <- min_block_size
         block_size <- sample(min_block_size:max_block_size, 1)
         possible_starts <- available_indices[available_indices + block_size - 1 <= max(available_indices)]
+        if (!length(possible_starts)) return(integer(0))
         for (start_idx in sample(possible_starts)) {
           block <- start_idx:(start_idx + block_size - 1)
-          overlaps <- any(unlist(lapply(used_blocks, function(x) any(block %in% x))))
+          overlaps <- any(vapply(used_blocks, function(x) any(block %in% x), logical(1)))
           if (!overlaps && all(block %in% available_indices)) return(block)
         }
-        return(integer(0))
+        integer(0)
       }
 
-      available_indices <- setdiff(1:n_features, unlist(used_feature_blocks))
+      available_indices <- setdiff(seq_len(n_features), unlist(used_feature_blocks, use.names = FALSE))
       feature_block <- generate_sequential_feature_block(available_indices, used_blocks = used_feature_blocks)
+
+      # Record indices (the annotation you want)
       used_feature_blocks[[factor_name]] <- feature_block
+      feature_annotation[[omic_idx]][[factor_name]] <- feature_block
+
+      # Create betas and inject signal on the chosen indices
       beta <- rnorm(n_features, mean = 0, sd = 0.01)
-      beta[feature_block] <- rnorm(length(feature_block), mean = feature_mean + 0.5 * factor_i, sd = feature_sd)
+      if (length(feature_block)) {
+        beta[feature_block] <- rnorm(length(feature_block),
+                                     mean = feature_mean + 0.5 * factor_i,
+                                     sd = feature_sd)
+      }
       list_betas[[omic_idx]][[paste0("beta", factor_i)]] <- beta
-      alpha <- list_alphas[[paste0("alpha", factor_i)]]
+
+      # Add factor contribution
+      alpha <- list_alphas[[factor_i]]
       omic_data <- omic_data + outer(alpha, beta)
     }
 
     # Always add noise
-    if (real_stats) {
+    if (isTRUE(real_stats)) {
       real_mean <- real_means_vars[[omic_idx]]["mean"]
-      real_var <- real_means_vars[[omic_idx]]["var"]
-      noise_matrix <- matrix(rnorm(n_samples * n_features, mean = real_mean, sd = sqrt(real_var)), nrow = n_samples, ncol=n_features)
+      real_var  <- real_means_vars[[omic_idx]]["var"]
+      noise_matrix <- matrix(rnorm(n_samples * n_features, mean = real_mean, sd = sqrt(real_var)),
+                             nrow = n_samples, ncol = n_features)
       signal_var <- var(as.vector(omic_data))
       if (signal_var == 0) {
         omic_data <- noise_matrix
@@ -263,32 +285,53 @@ simulateMultiOmics <- function(
     } else {
       signal_var <- var(as.vector(omic_data))
       if (signal_var == 0) {
-        noise_matrix <- matrix(rnorm(n_samples * n_features, mean = 0, sd = 1), nrow = n_samples)
+        noise_matrix <- matrix(rnorm(n_samples * n_features, mean = 0, sd = 1),
+                               nrow = n_samples, ncol = n_features)
         omic_data <- noise_matrix
       } else {
         noise_sd <- sqrt(signal_var / snr)
-        noise_matrix <- matrix(rnorm(n_samples * n_features, mean = 0, sd = noise_sd), nrow = n_samples)
+        noise_matrix <- matrix(rnorm(n_samples * n_features, mean = 0, sd = noise_sd),
+                               nrow = n_samples, ncol = n_features)
         omic_data <- omic_data + noise_matrix
       }
     }
 
-    colnames(omic_data) <- paste0("omic", omic_idx, "_feature_", 1:n_features)
-    rownames(omic_data) <- paste0("sample_", 1:n_samples)
+    colnames(omic_data) <- paste0("omic", omic_idx, "_feature_", seq_len(n_features))
+    rownames(omic_data) <- paste0("sample_",  seq_len(n_samples))
     omic.list[[omic_idx]] <- omic_data
   }
 
-  signal_annotation$features <- list_betas
-  names(omic.list) <- paste0("omic", seq_len(k))
+  # Put the **indices** into the annotation
+  signal_annotation$features <- feature_annotation
+
+  # Concatenate all omics (samples x total_features)
   concatenated_dataset <- do.call(cbind, omic.list)
   rownames(concatenated_dataset) <- paste0("sample_", seq_len(n_samples))
 
-  return(list(
+  # Return
+  list(
     concatenated_datasets = list(concatenated_dataset),
-    omics = omic.list,
-    list_alphas = list_alphas,
-    list_betas = list_betas,
-    signal_annotation = signal_annotation,
-    factor_structure = factor_structure,
-    factor_map = factor_omic_map
-  ))
+    omics             = omic.list,
+    list_alphas       = list_alphas,
+    list_betas        = list_betas,          # full beta vectors (for completeness)
+    signal_annotation = signal_annotation,    # <- **indices** per omic/factor
+    factor_structure  = factor_structure,
+    factor_map        = factor_omic_map
+  )
 }
+
+# # Example run
+# sim <- simulateMultiOmics(
+#   vector_features = c(5000, 4248),     # 2 omics: 50 + 40 features
+#   n_samples       = 200,            # 30 samples
+#   n_factors       = 2,             # 2 latent factors
+#   snr             = 0.5,             # signal-to-noise ratio
+#   signal.samples  = c(1, 0.5),       # mean and sd for sample-level signal
+#   signal.features = list(
+#     c(2, 0.1),                     # omic1: mean=2, sd=0.1
+#     c(3, 0.2)                      # omic2: mean=3, sd=0.2
+#   ),
+#   factor_structure = "mixed",      # factors hit random subsets of omics
+#   num.factor       = "multiple",   # allow multiple latent factors
+#   seed             = 1234
+# )
