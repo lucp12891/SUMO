@@ -6,6 +6,14 @@ SUMO is an R package for generating synthetic multi-omics datasets with known la
 
 Each omics layer has its own feature space, while samples are shared across layers. Signals can affect all layers, individual layers, or subsets of layers.
 
+## Published paper
+
+Osang’ir, B. I., Gupta, S., Shkedy, Z., and Claesen, J. (2025). **SUMO: an R package for simulating multi-omics data for methods development and testing.** *Bioinformatics Advances*, **5**(1), vbaf264.
+
+**DOI:** [10.1093/bioadv/vbaf264](https://doi.org/10.1093/bioadv/vbaf264)
+
+Please cite this paper when using SUMO in your work.
+
 ## Installation
 
 Requires **R 4.2 or later**. Install the development version from GitHub:
